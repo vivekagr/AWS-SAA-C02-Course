@@ -175,6 +175,13 @@ A VPC is private and isolated until decided otherwise.
 One default VPC per region. Can have many custom VPCs which are all private
 by default.
 
+Exam facts:
+- regions can only have 1 default VPC and many custom VPCs
+- custom VPCs allow flexible network configuration, the default VPC has a fixed scheme
+- there's no limit to how many services use the default VPC
+- some services can behave oddly if the default VPC doesn't exist (better to not remove it)
+- default VPCs can be recreated
+
 #### Default VPC Facts
 
 VPC CIDR - defines start and end ranges of the VPC.
@@ -1811,6 +1818,15 @@ Since each Region has at least 3 AZ's, it is a good practice to start
 splitting the network into 4 different AZs.
 This allows for at least one subnet in each AZ, and one spare.
 Taking a /16 subnet and splitting it 16 ways will make each a /20.
+
+### Default VPC facts
+
+- regions can only have 1 default VPC and many custom VPCs
+- custom VPCs allow flexible network configuration, the default VPC has a fixed scheme
+- there's no limit to how many services use the default VPC
+- some services can behave oddly if the default VPC doesn't exist (better to not remove it)
+- default VPCs can be recreated
+
 
 ### Custom VPC
 
