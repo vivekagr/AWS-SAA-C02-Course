@@ -1938,6 +1938,8 @@ always takes priority. This is the exception to the prefix rule.
 
 #### Internet Gateway
 
+**PUBLIC SUBNET** - a subnet that's associated with a route table that has a route to an Internet Gateway
+
 A managed service that allows gateway traffic between the VPC and the internet
 or AWS Public Zones (S3, SQS, SNS, etc.)
 
@@ -2103,6 +2105,16 @@ that boundary. If the resource is in the same subnet, it will not do anything.
 ### Network Address Translation (NAT) Gateway
 
 Internet Gateways are Region-resilient, but NAT Gateways are AZ-resilient.
+- this means that **1 NAT Gateway is associated with only 1 subnet** and this subnet has to be **public** (i.e. has to be able to connect to Internet Gateway to allow for public IP)
+- therefore we have to create **one NAT Gateway for each AZ we are operating in !!!!**
+
+REMEMBER: one subnet can have 0-1 route tables, but 1 route table can be associated with 0-many subnets (One-To-Many relationship)
+
+How do private subnet + NAT Gateway in a public subnet + Internet Gateway work together?
+- 1) traffic originates from one of the **private subnets' devices** (it has to originate there, cannot originate in public internet)
+- 2) the **private subnet** in which device resides has a **route table associated** - this route table routes traffic to a NAT Gateway
+- 3) this NAT Gateway (one for each AZ) resides in a **public subnet** - a subnet that's associated with a route table that has a route to an Internet Gateway
+- 4) therefore it uses this public subnet's route table to route traffic to Internet Gateway
 
 NAT Gateway vs NAT Instance - **most important difference** which features on exams often is the security difference.
 NAT Gateway **can only use NACL**, while NAT Instances **can use NACL or Security Groups attached to the EC2 instance**.
