@@ -2058,7 +2058,7 @@ back on a different port.
 #### NACL Exam PowerUp
 
 - NACLs are stateless
-  - Initiation and response traffic are separate streams requiring two rules.
+- Initiation and response traffic are separate streams requiring two rules.
 - NACLs are attached to subnets and only filter data as it crosses the
 subnet boundary. Two EC2 instances in the same subnet will not check against
 the NACLs when moving data.
@@ -2107,6 +2107,10 @@ Internet Gateways are Region-resilient, but NAT Gateways are AZ-resilient.
 NAT Gateway vs NAT Instance - **most important difference** which features on exams often is the security difference.
 NAT Gateway **can only use NACL**, while NAT Instances **can use NACL or Security Groups attached to the EC2 instance**.
 
+**NAT Gateways don't work with IPv6 !!!**. That's because inside AWS **all IPv6 addresses are publicly routable**.
+The Internet Gateway works directly with IPv6 addresses.
+- for IPv6, setting "::/0 Route" + Internet Gateway allows **bi-directional connectivity**
+- for IPv6, setting "::/0 Route" + Egress-Only Internet Gateway allows **outbound only connectivity**
 Set of different processes that can address IP packets by changing
 their source or destination addresses.
 
@@ -2115,16 +2119,16 @@ addresses to use one public IP for **outgoing** internet access.
 Incoming connections don't work. Outgoing connections can get a response
 returned.
 
+- **Gives Private CIDR range outgoing internet access** - this means that private devices can initiate outgoing connection to public Internet and receive response data, **but connections cannot be initiated from the public internet to these private IP addresses.** This means NAT Gateways are **not bi-directional**.
 - Must run from a public subnet to allow for public IP address.
-  - Internet Gateway subnets configure to allocate public IPv4 addresses
+- Internet Gateway subnets configure to allocate public IPv4 addresses
   and default routes for those subnets pointing at the IGW.
 - Uses Elastic IPs (Static IPv4 Public)
   - Don't change
   - Allocated to your account
 - AZ resilient service , but HA in that AZ.
   - If that AZ fails, there is no recovery.
-- For a fully region resilient service, you must deploy one NATGW in each AZ
-with a Route Table in each AZ with NATGW as target.
+- For a **fully region resilient service, you must deploy one NATGW in each AZ with a Route Table in each AZ with NATGW as target**.
 - Managed service, scales up to 45 Gbps. Can deploy multiple NATGW to increase
 bandwidth.
 - AWS charges on usage per hour and data volume processed.
