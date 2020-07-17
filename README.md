@@ -2102,6 +2102,11 @@ that boundary. If the resource is in the same subnet, it will not do anything.
 
 ### Network Address Translation (NAT) Gateway
 
+Internet Gateways are Region-resilient, but NAT Gateways are AZ-resilient.
+
+NAT Gateway vs NAT Instance - **most important difference** which features on exams often is the security difference.
+NAT Gateway **can only use NACL**, while NAT Instances **can use NACL or Security Groups attached to the EC2 instance**.
+
 Set of different processes that can address IP packets by changing
 their source or destination addresses.
 
