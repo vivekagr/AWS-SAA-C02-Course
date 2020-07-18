@@ -2290,6 +2290,15 @@ Server style applications
 
 ### EC2 Instance Types
 
+What's the difference between instance types?
+- Raw CPU, Memory, local Storage capacity & type
+- **resource ratios** (e.g. higher CPU/memory ratio or memory/CPU)
+- storage and data network **bandwidth**
+- system architecture / vendor (e.g. AMD, Intel)
+- additional features and capabilities (e.g. graphic cards)
+
+
+What are the type categories?
 - **General Purpose** (T, M) - default steady state workloads with even resources
 - **Compute Optimized** (C) - Media processing, scientific modeling and gaming
 - **Memory Optimized** (R, X) - Processing large in-memory data sets
@@ -2315,10 +2324,12 @@ full instance type
 ### Storage Refresher
 
 - **Instance Store**
+  - Block Storage (see below)
   - Direct (local) attached storage
   - Super fast
   - Ephemeral storage or temporary storage
 - **Elastic Block Store (EBS)**
+  - Block Storage (see below)
   - Network attached storage
   - Volumes delivered over the network
   - Persistent storage lives on past the lifetime of the instance
@@ -2331,31 +2342,39 @@ create a file system on top of this, NTFS or EXT3 and then it mounts
 it as a drive or a root volume on Linux. Spinning hard disks or SSD. This
 could also be delivered by a physical volume. Has no built in structure.
 You can mount an EBS volume or boot off an EBS volume.
+  - mountable
+  - bootable
 
 - File Storage: Presented as a file share with a structure. You access the
 files by traversing the storage. You cannot boot from storage, but you
 can mount it.
+  - mountable
+  - not bootable
 
 - Object Storage: It is a flat collection of objects. An object can be anything
 with or without attached metadata. To retrieve the object, you need to provide
 the key and then the value will be returned. This is not mountable or
 bootable. It scales very well and can have simultaneous access.
+  - not mountable
+  - not bootable
 
 #### Storage Performance
-
+These 3 things cannot exist in isolation:
 - IO Block Size: Determines how to split up the data.
-- IOPS: How many reads or writes a system can accommodate per second.
+- IOPS (Input Output Per Second): How many reads or writes a system can accommodate per second.
 - Throughput: End rate achieved, expressed in MB/s (megabyte per second).
 
 `Block Size * IOPS = Throughput`
 
-This isn't the only part of the chain, but it is a simplification.
-A system might have a throughput cap. The IOPS might decrease as the block
-size increases.
+We need to pick the right size of IO Block Size and maximize the IOPS to achieve the highest Throughput.
+
+Too large IO Block Size = the IOPS will decrease
 
 ### Elastic Block Store (EBS)
-
-- Allocate block storage **volumes** to instances.
+- Provides **network storage** for the EC2 service
+- We use EBS to create **volumes** in an **Availability Zone**, and we can attach this volume to EC2 instances in **the same AZ**
+- Everytime we launch EC2 instance, we're using EBS behind the scenes for the **boot volume** of that instance
+- Allocate block storage (**volumes**) to instances.
 - Volumes are isolated to one AZ.
   - The data is highly available and resilient for that AZ.
   - All of the data is replicated within that AZ. The entire AZ must have
@@ -2373,7 +2392,11 @@ size increases.
     - maximum t-put for logs or media storage
   - Cold HDD (sc1)
 
-#### General Purpose SSD (gp2)
+
+**SSD-based types of volumes focus on IOPS**
+**HDD-based types of volumes focus on Throughput (MiB/s)**
+
+#### EBS - General Purpose SSD (gp2)
 
 Uses a performance bucket architecture based on the IOPS it can deliver.
 The GP2 starts with 5,400,000 IOPS allocated. It is all available instantly.
@@ -2388,7 +2411,7 @@ This is the **baseline performance**
 Default for boot volumes and should be the default for data volumes.
 Can only be attached to one EC2 instance at a time.
 
-#### Provisioned IOPS SSD (io1)
+#### EBS - Provisioned IOPS SSD (io1)
 
 You pay for capacity and the IOPs set on the volume.
 This is good if your volume size is small but need a lot of IOPS.
@@ -2404,7 +2427,7 @@ Multi-attach allows them to attach to multiple EC2 instances at once.
 - great value
 - great for high throughput vs IOPs
 - 500 GiB - 16 TiB
-- Neither can be used for EC2 boot volumes.
+- **Neither can be used for EC2 boot volumes!!!!!!!!**
 - Good for streaming data on a hard disk.
   - Media conversion with large amounts of storage.
 - Frequently accessed high throughput intensive workload
@@ -2415,12 +2438,12 @@ Multi-attach allows them to attach to multiple EC2 instances at once.
 
 Two types
 
-- st1
+- st1 (notice letter 't' - Throughput optimised)
   - Starts at 1 TiB of credit per TiB of volume size.
   - 40 MB/s baseline per TiB
   - Burst of 250 MB/s per TiB
   - Max t-put of 500 MB/s
-- sc1
+- sc1 (notice letter 'c' - Cold Storage HDD)
   - Designed for less frequently accessed data, it fills slower.
   - 12 MB/s baseline per TiB
   - Burst of 80 MB/s per TiB
@@ -2429,8 +2452,8 @@ Two types
 #### EBS Exam Power Up
 
 - Volumes are created in an AZ, isolated in that AZ.
-- If an AZ fails, the volume is impacted.
-- Highly available and resilient in that AZ. The only reason for failure is
+- If an AZ fails, the volume is impacted. **Snapshots help there** (Snapshots are backups of volume that are put in S3 - it makes them Region resilient)
+- Highly available and resilient in that AZ. (**Replicates data to multiple storage platforms in one AZ**) The only reason for failure is
 if the whole AZ fails.
 - Generally one volume to one instance, except **io1** with multi-attach
 - Has a GB/m fee regardless of instance state.
@@ -2441,11 +2464,11 @@ if the whole AZ fails.
 
 - Local **block storage** attached to an instance.
 - Physically connected to one EC2 host.
-  - They are isolated to that one specific host.
-  - Instances on that host can access them.
+  - They are isolated to that one specific **host**.
+  - **Instances on that host can access them**.
 - Highest storage performance in AWS.
 - Included in instance price, use it or lose it.
-- Can be attached ONLY at launch. Cannot be attached later.
+- Can be attached **ONLY at launch**. Cannot be attached later.
 
 Each instance has a collection of volumes that are
 locked to that specific host. If the instance moves, the data doesn't.
@@ -2465,10 +2488,11 @@ at all.
 
 - Instance store volumes are local to EC2 host.
 - Can only be added at launch time. Cannot be added later.
-- Any data on instance store data is lost if it gets moved, or resized.
-- Highest data performance in all of AWS.
+- Lost on instance **move**, **resize** or **hardware failure**
+- **Highest data performance in all of AWS**.
+  - more IOPS and Throughput vs EBS
 - You pay for it anyway, it's included in the price.
-- TEMPORARY
+- TEMPORARY - **we can't use Instance Store for anything that requires secure, persistent data**
 
 ### EBS vs Instance Store
 
@@ -2476,34 +2500,38 @@ If the read/write can be handled by EBS, that should be default.
 
 When to use EBS
 
-- Highly available and reliable in an AZ. Can self correct against HW issues.
+- **Highly available and reliable in an AZ**. Can self correct against HW issues.
 - Persist independently from EC2 instances.
   - Can be removed or reattached.
-  - You can terminated instance and keep the data.
+  - You can terminate instance and keep the data.
 - Multi-attach feature of **io1**
   - Can create a multi shared volume.
-- Region resilient backups.
-- Require up to 64,000 IOPS and 1,000 MiB/s per volume
-- Require up to 80,000 IOPS and 2,375 MB/s per instance
+- **Region resilient backups**. (Snapshots - automated backups of volume to S3. For Instance Store there's no automated, AWS-native solution)
+- Require **up to 64,000 IOPS and 1,000 MiB/s per volume** - remember for exam
+- Require **up to 80,000 IOPS and 2,375 MB/s per instance** - remember for exam
 
 When to use Instance Store
 
 - Great value, they're included in the cost of an instance.
-- More than 80,000 IOPS and 2,375 MB/s
+- **More than 80,000 IOPS and 2,375 MB/s per instance** - we can go into milions here
 - If you need temporary storage, or can handle volatility.
-- Stateless services, where the server holds nothing of value.
-- Rigid lifecycle link between storage and the instance.
+  - e.g. database server with: boot in gp2, persistent store in io2, temporary store in Instance Store
+- **Stateless** services, where the server holds nothing of value.
+- Hard lifecycle link between storage and the instance.
   - This ensures the data is erased when the instance goes down.
 
 ### EBS Snapshots, restore, and fast snapshot restore
 
 - Efficient way to backup EBS volumes to S3.
   - The data becomes region resilient.
-- Can be used to migrate data between hosts.
+- Can be used to migrate data between hosts ...
+  - in the same AZ
+  - in different AZ
+  - in different region
 
 Snapshots are incremental volume copies to S3.
 The first is a **full copy** of `data` on the volume. This can take some time.
-EBS won't be impacted, but will take time in the background.
+EBS won't be impacted, but will take time to copy in the background.
 Future snaps are incremental, consume less space and are quicker to perform.
 
 If you delete an incremental snapshot, it moves data to ensure subsequent
@@ -2522,26 +2550,32 @@ available immediately.
   - If you attempt to read data that hasn't been restored yet, it will
   immediately pull it from S3, but this will achieve lower levels of performance
   than reading from EBS directly.
-  - You can force a read of every block all data immediately using DD.
+  - You can force a read of every block all data immediately using 'dd' command - this will make sure the data is pulled ASAP, not when someone references it e.g. week later
+
+### Snapshot and volume performance - FSR
 
 Fast Snapshot Restore (FSR) allows for immediate restoration.
 You can create 50 of these FSRs per region. When you enable it on
-a snapshot, you pick the snapshot specifically and the AZ that you want to be
-able to do instant restores to. Each combination of Snapshot and AZ counts
-as one FSR set. You can have 50 FSR sets per region.
-FSR is not free and can get expensive with lost of different snapshots.
+a snapshot, you pick the **snapshot specifically and the AZ** that you want to be
+able to do instant restores to. Each combination of **Snapshot and AZ** counts
+as **one FSR set**. You can have 50 FSR sets per region.
+FSR is not free and can get expensive with lots of different snapshots.
 
 #### Snapshot Consumption and Billing
 
 Billed using a GB/month metric.
 20 GB stored for half a month, represents 10 GB-month.
 
-This is used data, not allocated data. If you have a 40 GB volume but only
+**This is used data, not allocated data.** If you have a 40 GB volume but only
 use 10 GB, you will only be charged for the allocated data.
 This is not how EBS itself works.
+  - in case of EBS, we pay for the allocated data (which includes data that is in use at any time, but also the data that is not used)
+  - in case of EBS snapshots, we only pay for the "used" data (i.e. the data that has been backed up)
 
-The data is incrementally stored which means doing a snapshot every 5 minutes
-will not necessarily increase the charge as opposed to doing one every hour.
+The data is incrementally stored which means **doing a snapshot every 5 minutes will not necessarily increase the charge as opposed to doing one every hour.**
+  - this means we can do snapshots frequently
+
+**At each stage, a new Snapshot is only storing data inside itself (which is new or changed), and it's referencing previous snapshots for anything which isn't changed.**
 
 #### EBS Encryption
 
