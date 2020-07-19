@@ -2396,7 +2396,7 @@ Too large IO Block Size = the IOPS will decrease
 **SSD-based types of volumes focus on IOPS**
 **HDD-based types of volumes focus on Throughput (MiB/s)**
 
-#### EBS - General Purpose SSD (gp2)
+#### SSD Volume Types: EBS - General Purpose SSD (gp2)
 
 Uses a performance bucket architecture based on the IOPS it can deliver.
 The GP2 starts with 5,400,000 IOPS allocated. It is all available instantly.
@@ -2411,7 +2411,7 @@ This is the **baseline performance**
 Default for boot volumes and should be the default for data volumes.
 Can only be attached to one EC2 instance at a time.
 
-#### EBS - Provisioned IOPS SSD (io1)
+#### SSD Volume Types: EBS - Provisioned IOPS SSD (io1)
 
 You pay for capacity and the IOPs set on the volume.
 This is good if your volume size is small but need a lot of IOPS.
@@ -2641,53 +2641,54 @@ Such encryption doesn't cost anything, so **we should use it by default**.
 
 ### EC2 Network Interfaces, Instance IPs and DNS
 
-An EC2 instance starts with at least one ENI - elastic network interface.
-An instance may have ENIs in separate subnets, but everything must be
-within one AZ.
+An EC2 instance starts with at least one ENI - elastic network interface. This first interface is called Primary ENI.
 
-When you launch an instance with Security Groups, they are on the
-network interface and not the instance.
+
+An instance may have ENIs in separate subnets, but everything must be within one AZ.
+
+When you launch an instance with e.g. Security Groups, they are attached to network interface and not the instance.
+
+
 
 #### Elastic Network Interface (ENI)
 
-Has these properties
+**Each ENI has following properties**:
 
 - MAC address
-- Primary IPv4 private address
+- Primary IPv4 **private** address
   - From the range of the subnet the ENI is within.
   - Will be static and not change for the lifetime of the instance
-    - `10.16.0.10`
-  - Given a DNS name that is associated with the address.
-    - `ip-10-16-0-10.ec2.internal`
-    - Only resolvable inside the VPC and always points at private IP address
+    - e.g. `10.16.0.10`
+  - **Given a DNS name that is associated with the address**.
+    - e.g. `ip-10-16-0-10.ec2.internal`
+    - **Only resolvable inside the VPC and always points at private IP address**
 - 0 or more secondary private IP addresses
 - 0 or 1 public IPv4 address
   - The instance must manually be set to receive an IPv4 address or spun into a
 subnet which automatically allocates an IPv4.
-This is a dynamic IP that is not fixed.
-If you stop an instance the address is removed.
-When you start up again, it is given a brand new IPv4 address.
-Restarting the instance will not change the IP address.
-Changing between EC2 hosts will change the address.
-This will be allocated a public DNS name. The Public DNS name will resolve to
-the primary private IPv4 address of the instance.
-Outside of the VPC, the DNS will resolve to the public IP address.
-This allows one single DNS name for an instance, and allows traffic to resolve
-to an internal address inside the VPC and the public will resolve to a public
-IP address.
+**This is a dynamic IP that is not fixed.**
+  - If you stop an instance the address is removed.
+  - When you start up again, it is given a brand new IPv4 address.
+  - Restarting the instance will not change the IP address.
+  - Changing between EC2 hosts will change the address.
+  - This will be allocated a **public DNS name !!!!!!!!!!!**.
+    - Outside of the VPC, the DNS will resolve to the public IP address.
+    - Inside of the VPC, the DNS will resolve to the private IP address.
+    - **!!!!!!!!!! This allows one single DNS name for an instance, and allows traffic to resolve to an internal address inside the VPC and the public will resolve to a public IP address.**
 - 1 elastic IP per private IPv4 address
-  - Can have 1 public elastic interface per private IP address on this interface.
-This is allocated to your AWS account.
-Can associate with a private IP on the primary interface or secondary interface.
-If you are using a public IPv4 and assign an elastic IP, the original IPv4
-address will be lost. There is no way to recover the original address.
+  - in contrary to regular public IPv4 addresses, **elastic addresses are static** and don't change
+  - ... therefore **we are charged for them even if they're not attached to any instance**
+  - If you use Elastic IP then you will always know what it is, as it stays the same, this helps in case you need to access services through the NAT inwards (forwarding).
+  - Can associate with a private IP on the **primary interface** or **secondary interface**.
+  - **in case of primary interface, if you are using a public IPv4 and assign an elastic IP, the original IPv4 address will be replaced with elastic IP**
+      - **if you remove the elastic IP, a regular (dyniamic) public IP address will be reassigned, but it won't be the exact same one as before**
 - 0 or more IPv6 address on the interface
   - These are by default public addresses.
 - Security groups
   - Applied to network interfaces.
   - Will impact all IP addresses on that interface.
   - If you need different IP addresses impacted by different security
-  groups, then you need to make multiple interfaces and apply different
+  groups, then you need to make multiple interfaces with these IP addresses being separated and apply different
   security groups to those interfaces.
 - Source / destination checks
   - If traffic is on the interface, it will be discarded if it is not
@@ -2702,20 +2703,19 @@ you can detach interfaces and move them to other EC2 instances.
   - If you provision a secondary ENI to a specific license, you can move
 around the license to different EC2 instances.
 - Multi homed (subnets) management and data.
-- Different security groups are attached to different interfaces.
-- The OS doesn't see the IPv4 public address.
+- **Different security groups can be attached to different interfaces**.
+- **!!!!!!!!!! The OS doesn't see the IPv4 public address !!!!!!!!!!!!!!!!**
+  - this is provided by process called "NAT" performed by the Internet Gateway
 - You always configure the private IPv4 private address on the interface.
 - Never configure an OS with a public IPv4 address.
 - IPv4 Public IPs are Dynamic, starting and stopping will kill it.
-
-Public DNS for a given instance will resolve to the primary private IP
-address in a VPC. If you have instance to instance communication within
-the VPC, it will never leave the VPC. It does not need to touch the internet
-gateway.
+- **Public DNS** for a given instance will resolve to the primary private IP
+address inside VPC, and to public IP outside VPC. If you have instance to instance communication within
+the VPC, it will never leave the VPC. It does not need to touch the Internet Gateway.
 
 ### Amazon Machine Image (AMI)
 
-Images of EC2 instances that can launch more EC2 instance.
+Images of EC2 instances that can be used to launch multiple EC2 instances with same configuration.
 
 - When you launch an EC2 instance, you are using an Amazon provided AMI.
 - Can be Amazon or community provided
@@ -2730,7 +2730,7 @@ Images of EC2 instances that can launch more EC2 instance.
 
 #### AMI Lifecycle
 
-1. Launch: EBS volumes are attached to EC2 devices using block IDs.
+1. Launch: EBS volumes are attached to EC2 devices using block device IDs.
 
    - BOOT /dev/xvda
    - DATA /dev/xvdf
@@ -2741,25 +2741,25 @@ Images of EC2 instances that can launch more EC2 instance.
 
     - AMI contains:
       - Permissions: who can use it, is it public or private
-      - EBS snapshots are created from attached EBS volumes
-        - Snapshots are referenced inside the AMI using block device mapping.
+      - **EBS snapshots are created from attached EBS volumes**
+        - **Snapshots are referenced inside the AMI using block device mapping**
         - Table of data that links the snapshot IDs that you've just
         created when making that AMI and it has for each one of those
         snapshots, a device ID that the original volumes had on the EC2
-        instance.
+        instance (e.g. "snapshot-abc123 /dev/xvda \n snapshot-def456 /dev/xvdf")
 
 4. Launch: When launching an instance, the snapshots are used to create new EBS
-volumes in the AZ of the EC2 instance and contain the same block device mapping.
+volumes in the AZ of the EC2 instance and contain the same block device mapping (i.e. /dev/xvda, /dev/xvdf)
 
 #### AMI Exam PowerUps
 
-- AMI can only be used in one region
-- AMI Baking: creating an AMI from a configuration instance.
-- An AMI cannot be edited. If you need to update an AMI, launch an instance,
-make changes, then make new AMI
-- Can be copied between regions
-- Remember permissions by default are your account only
-- Billing is for the storage capacity for the EBS snapshots the AMI references.
+- AMI can only be used in **one region**
+  - **... but can be copied across regions (includes its snapshots) !!!**
+- **AMI Baking**: creating an AMI from a configuration instance.
+- An **AMI cannot be edited**. If you need to update an AMI, launch an instance,
+make changes, then make **new AMI**
+- Remember permissions **by default are your account only**
+- Billing is for the **storage capacity for the EBS snapshots** the AMI references.
 
 ### EC2 Pricing Models
 
@@ -2775,47 +2775,61 @@ make changes, then make new AMI
 
 #### Spot Instances
 
-Up to 90% off on-demand, but depends on the spare capacity.
-You can set a maximum hourly rate in a certain AZ in a certain region.
-If the max price you set is above the spot price, you pay only that spot
+- Up to 90% off on-demand, but depends on the spare capacity.
+- You can set a maximum hourly rate in a certain AZ in a certain region.
+- If the max price you set is above the spot price, you pay only that spot
 price for the duration that you consume that instance.
-As the spot price increases, you pay more.
-Once this price increases past your maximum, it will terminate the instance.
-Great for data analytics when the process can occur later at a lower use time.
+- As the spot price increases, you pay more.
+- Once this price increases past your maximum, it will terminate the instance.
+- Useful for:
+  - Apps that have flexible start and end times
+  - Apps which only make sense at low cost
+  - Apps which can **tolerate failure** and continue later
+- Great for data analytics when the process can occur later at a lower use time.
 
 #### Reserved Instance
 
-Up to 75% off on-demand.
-The trade off is commitment.
-You're buying capacity in advance for 1 or 3 years.
-Flexibility on how to pay
+- Up to 75% off on-demand.
+- The trade off is commitment.
+- You're buying capacity in advance for 1 or 3 years.
+- Flexibility on how to pay
+  - All up front
+  - Partial upfront
+  - No upfront
 
-- All up front
-- Partial upfront
-- No upfront
+- Best discounts are for 3 years all up front.
+- Reserved in region, or AZ with capacity reservation.
+- Reserved instances take priority for AZ capacity.
+- Can perform scheduled reservation when you can commit to specific time windows.
 
-Best discounts are for 3 years all up front.
-Reserved in region, or AZ with capacity reservation.
-Reserved instances takes priority for AZ capacity.
-Can perform scheduled reservation when you can commit to specific time windows.
-
-Great if you have a known stead state usage, email usage, domain server.
-Cheapest option with no tolerance for disruption.
+- Great if you have a known stead state usage, email usage, domain server.
+- Cheapest option with **no tolerance for disruption**
 
 ### Instance Status Checks and Autorecovery
 
 Every instance has two high level status checks
 
-- System Status Checks
-  - Failure of this check could indicate SW or HW problems of the EC2
-service or the host.
-- Instance Status Checks
-  - Specific to the file system or has a corrupted Kernel.
+- **System Status Checks**
+  - Failure on:
+    - loss of system power
+    - loss of network connectivity
+    - **host** software issues
+    - **host** hardware issues
+- **Instance Status Checks**
+  - Failure on:
+    - Corrupted file system
+    - Incorrect Instance Networking
+    - OS Kernel Issue
 
-Autorecovery can kick in and help,
+Autorecovery can kick in and help:
 
 - Recover this instance
   - can be a number of steps depending on the failure
+  - all recovery steps are performed inside the AZ our instance resides in
+  - ... this means that **this recovery process won't work if an AZ fails**
+  - **doesn't support all instance types, only a subset of them - particularly newest generations**
+  - **doesn't work on instances that only use Instance Store - we need to have EBS volume attached**
+  - **very simple feature, not meant for recovery of large scale or complex systems**
 - Stop this instance
 - Terminate this instance
   - useful in a cluster
@@ -2828,40 +2842,60 @@ Autorecovery can kick in and help,
 As customer load increases, the server may need to grow to handle more data.
 The server can increase in capacity, but this will require a reboot.
 
+- Each resize requires a reboot - **disruption**
 - Often times vertical scaling can only occur during planned outages.
 - Larger instances also carry a $ premium compared to smaller instances.
 - Instance size is an upper cap on performance.
-- No application modification is needed.
-  - Works for all applications, even monoliths (all code in one app)
+- **No application modification is needed**
+  - if an application can run in an instance, it can run in a bigger instance
+  - works for all applications, even monoliths (all code in one app)
 
 #### Horizontal Scaling
 
 As the customer load increases, this adds additional capacity.
 Instead of one running copy of an application, you can have multiple versions
 running on each server.
-This requires a load balancer.
+
+
+**This requires a load balancer.**
 When customers try to access an application, the load balancer ensures the
 servers get equal parts of the load.
 
 - Sessions are everything.
-- With horizontal scaling you can shift between instances equally.
-- This requires either application support or off-host sessions.
+- With horizontal scaling you may shift between instances
+  - to cope with this, we need either application support or off-host sessions.
 - Servers are **stateless**, the app stores session data elsewhere.
-- No disruption while scaling up or down.
+  - **No disruption while scaling up or down**
 - No real limits to scaling.
 - Uses smaller instances so you pay less, allows for better granularity.
 
 ### Instance Metadata
 
-EC2 service provides data to instances
-Accessible inside all instances
+**Important topic - is often brought up on exams**
+EC2 service provides data to EC2 Instances
+Accessible inside ALL instances
 
-Memorize `http://169.254.169.254/latest/meta-data/`
+**Memorize `http://169.254.169.254/latest/meta-data/` !!!!!!**
+  - we can curl it from inside of EC2 Instances
+  - e.g. to get a public IPv4 address of an instance, run: `curl http://169.254.169.254/latest/meta-data/public-ipv4`
 
-Meta-data contains information on the environment the instance is in.
-You can find out about the networking or user-data among other things.
-This is not authenticated or encrypted. Anyone who can gain access to the
-instance can see the meta-data. This can be restricted by local firewall
+Metadata contains information on:
+- Environment
+- Networking (e.g. instance's public IP address)
+- Authentication
+  - EC2 Instance can assume a Role and gain access to other AWS resources
+- User-Data
+
+
+We can also use **ec2-metadata** tool.
+- to download it, run: `wget http://s3.amazonaws.com/ec2metadata/ec2-metadata`
+- `./ec2-metadata --help` - list possible arguments
+- `./ec2-metadata -a` - to get AMI (ami-id) used to launch the instance
+- `./ec2-metadata -z` - to get AZ
+- `./ec2-metadata -s` - to get Security Groups
+
+**Metadata doesnt' require authentication and is not encrypted !!!!!**. Anyone who can gain access to the
+instance can see the meta-data. This can be restricted by local firewall rules (blocking accesss to 169.254.169.254)
 
 ---
 
