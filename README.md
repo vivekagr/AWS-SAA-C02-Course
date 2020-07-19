@@ -2452,6 +2452,12 @@ Two types
 #### EBS Exam Power Up
 
 - Volumes are created in an AZ, isolated in that AZ.
+- If we want to migrate them into another AZ, we need to create **snapshots**. Snapshots are created in the same region where origin AZ is, but can be later copied to other regions. Therefore we can migrate our EBS volumes across AZs and Regions.
+- To migrate across same region (from one AZ to another):
+  - first, create snapshot of EBS volume 1
+  - when the snapshot is ready, create a new EBS volume 2 **from this snapshot**
+  - attach the EBS volume 2 to instance in it's AZ
+- To migrate across different region - copy the snapshot to another region and then create a new EBS volume from it.
 - If an AZ fails, the volume is impacted. **Snapshots help there** (Snapshots are backups of volume that are put in S3 - it makes them Region resilient)
 - Highly available and resilient in that AZ. (**Replicates data to multiple storage platforms in one AZ**) The only reason for failure is
 if the whole AZ fails.
@@ -2524,7 +2530,7 @@ When to use Instance Store
 
 - Efficient way to backup EBS volumes to S3.
   - The data becomes region resilient.
-- Can be used to migrate data between hosts ...
+- Can be used to **migrate data** between hosts ...
   - in the same AZ
   - in different AZ
   - in different region
@@ -2595,42 +2601,43 @@ the physical disk. This key can only be encrypted by KMS when a role with
 the proper permissions makes the request.
 
 When the volume is first used, EBS asks CMS to decrypt the key and stores
-the decrypted key in memory on the EC2 host while it's being used. At all
-other times it's stored on the volume in encrypted form.
+the decrypted key in **memory on the EC2 host** while it's being used. At all
+times it's encrypted form is stored on the EBS volume.
 
 When the EC2 instance is using the encrypted volume, it can use the
-decrypted data encryption key to move data on and off the volume. It is used
+decrypted data encryption key to read and write data to the volume. It is used
 for all cryptographic operations when data is being used to and from the
 volume.
 
 When data is stored at rest, it is stored as ciphertext.
 
-If the EBS volume is ever moved, the key is discarded.
+If the EBS volume is ever moved, the decrypted key is discarded from the original Host's memory, leaving only the encrypted version on the physical storage of EBS volume.
+Then if an instance wants to use this volume again, it has to decrypt the key using KMS and load it into it's new EC2 Host.
 
-If a snapshot is made of an encrypted EBS volume, the same data encryption
-key is used for that snapshot. Anything made from this snapshot is also
-encrypted in the same way.
+If a snapshot is made of an encrypted EBS volume, the **same data encryption key** is used for that snapshot. Any **volume** made from this snapshot is **by default also encrypted** in the same way, although we can pick **different CMK**.
 
-Every time you create a new EBS volume from scratch, it creates a new
-data encryption key.
+Every time you create a new EBS volume from scratch, it creates a new data encryption key.
+
+Such encryption doesn't cost anything, so **we should use it by default**.
 
 ##### EBS Encryption Exam Power Up
 
-- AWS accounts can be set to encrypt EBS volumes by default.
+- AWS accounts can be set to encrypt all new EBS volumes by default (it's done in EC2 Dashboard - per region)
+  - **it doesn't cost anything and doesn't cause any performance issues**
   - It will use the default CMK unless a different one is chosen.
   - Each volume uses 1 unique DEK (data encryption key)
-  - Snapshots and future volume use the same DEK
+  - Snapshots and future volumes made from that snapshot also use the same DEK
 - Can't change a volume to NOT be encrypted.
   - You could mount an unencrypted volume and copy things over but you can't
   change the original volume.
-- The OS itself isn't aware of the encryption, there is no performance loss.
+- **The EC2 instance OS itself isn't aware of the encryption !!!!!!!, there is no performance loss.**
   - The volume itself is encrypted using AES256
   - This occurs between the EC2 host and the EBS system itself.
   - The OS does not see any encryption. It simply writes data out and reads
   data in from a disk.
-  - If an exam question does not use AES256, or it suggests you need an OS to
-encrypt or hold the keys, then you need to perform full disk encryption
-at the operating system level.
+- **If an exam question does not use AES256, or it suggests you need an OS to encrypt or hold the keys, then you need to perform full disk encryption at the operating system level.**
+  - We can use full disk encryption on OS level, along with either EBS volume encryption or no EBS volume encryption - those are 2 separate things
+  - in case of full disk encryption on OS level, there will be **CPU performance penalty**
 
 ### EC2 Network Interfaces, Instance IPs and DNS
 
