@@ -3029,11 +3029,12 @@ This could perform some software installs and post install configs.
 Bootstrapping is done using **user data** and is injected into the instance
 in the same way that meta-data is. It is accessed using the meta-data IP.
 
-<http://169.254.169.254/latest/>
+<http://169.254.169.254/latest/user-data>
 
-Anything you pass in is executed by the instance OS only once on launch!
+Anything you pass in is executed by the instance OS **only once on launch**!
+- **if we update user data and restart instance, it won't be executed again**
 
-EC2 doesn't validate the user data. You can tell EC2 to pass in trash data
+**EC2 doesn't validate the user data**. You can tell EC2 to pass in trash data
 and the data will be injected. The OS needs to understand the user data.
 
 #### Bootstrapping Architecture
@@ -3047,34 +3048,48 @@ There is SW within the OS designed to look at the metadata IP for any user data.
 If it sees any user data, it executes this on launch of that instance.
 
 This is treated like any other script the OS runs. At the end of running
-the script, the instance will be in:
+the script, the instance will either be in:
 
 - Running state and ready for service.
+
+or
+
+
 - Bad config but still likely running.
   - The instance will probably still pass its checks.
   - It will not be configured as you expected.
 
 #### User Data Key Points
 
-EC2 doesn't know what the user data contains, it's just a block of data.
-The user data is not secure, anyone can see what gets passed in. For this
+- EC2 doesn't know what the user data contains, it's just a block of data.
+- The user data is not secure, anyone can see what gets passed in. For this
 reason it is important not to pass passwords or long term credentials.
 
-User data is limited to 16 KB in size. Anything larger than this will
+- User data is limited to 16 KB in size. Anything larger than this will
 need to pass a script to download the larger set of data.
 
-User data can be modified if you stop the instance, change the user
+- User data can be modified if you stop the instance, change the user
 data, then restart the instance. This won't be executed since the instance
 has already started.
 
 #### Boot-Time-To-Service-Time
 
 How quickly after you launch an instance is it ready for service?
-This includes the time for EC2 to configure the instance and any software
+This includes the time for EC2 to provision the instance and any software
 downloads that are needed for the user.
 When looking at an AMI, this can be measured in minutes.
 
+Bootstrapping is about automating installation **after the launch** of the instance.
+- AMI -> Instance -> Bootstrapping
+- gives more configurability than AMI baking, but increases Post Launch Time (time needed for the installation/configuration to finish)
+
+
 AMI baking will front load the time needed by configuring as much as possible.
+- AMI baking -> AMI -> Instance
+- gives less configurability than Bootstrapping, but decreases Post Launch Time. We need to AMI bake installation/configuration which don't change across our instances and don't need to be configured.
+
+
+The optimal way is to combine both of these processes (bootstrapping and AMI baking)
 
 ### AWS::CloudFormation::Init
 
