@@ -2970,6 +2970,12 @@ ECS Cluster manages:
 - Cluster manager
 - Placement engine
 
+
+**ECS Cluster types:**
+- Fargate (Network Only)
+- EC2 Linux + Networking
+- EC2 Windows + Networking
+
 #### EC2 mode
 
 ECS cluster is created within a VPC. It benefits from the multiple AZs that
