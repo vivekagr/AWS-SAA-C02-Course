@@ -2960,6 +2960,16 @@ A single image can generate Containers on many different Docker hosts.
   AWS resources.
 - Task is not by itself highly available.
 
+
+
+Benefits of containers:
+- fast to startup
+- portable
+- lightweight
+
+Containers are **not fully** isolated from other containers.
+
+
 ECS **Service** is configured via Service Definition and represents
 how many copies of a task you want to run for scaling and HA.
 
