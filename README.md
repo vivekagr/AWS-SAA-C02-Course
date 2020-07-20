@@ -2946,6 +2946,7 @@ A single image can generate Containers on many different Docker hosts.
 
 ### Elastic Container Service (ECS) Concepts
 
+- **supports only Docker standard !!!!!!!! i.e. no Cargo and others**
 - Accepts containers and instructions you provide.
 - ECS allows you to create a cluster.
   - Clusters are where containers run from.
