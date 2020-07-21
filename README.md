@@ -3111,7 +3111,7 @@ The optimal way is to combine both of these processes (bootstrapping and AMI bak
 ### AWS::CloudFormation::Init
 
 **cfn-init** is a helper script installed on EC2 OS.
-This is a simple configuration management system.
+This is much more complex than User Data.
 
 - User Data is procedural and run by the OS line by line.
 - cfn-init can be procedural, but can also be desired state.
@@ -3119,6 +3119,10 @@ This is a simple configuration management system.
   configured to that end state.
   - Can manipulate OS groups and users.
   - Can download sources and extract them using authentication.
+- Handles packages, groups, users, sources, files, commands, services
+- Provided with directives via **Metadata** section, directive **AWS::CloudFormation::Init** on a CFN resource
+- **User Data can be run once (on launch), whereas cfn-init can be configured to watch for updates of metadata on an object in a template**
+  - **... if that metadata changes, then cfn-init can be executed again and make changes to configuration**
 
 This is executed as any other command by being passed into the instance as part
 of the user data and retrieves its directives from the CloudFormation
@@ -3148,6 +3152,10 @@ inside a CloudFormation template. You create it and supply a timeout value.
 This waits for a signal from the resource itself before moving to a create
 complete state.
 
+Signal can be sent using `/opt/aws/bin/cfn-signal -e $? --stack ... --resource ... --region ...`
+- this line should be added after running `cfn-init` command
+- both of these lines would be put in User Data
+
 ### EC2 Instance Roles
 
 IAM roles are the best practice ways for services to be granted permissions.
@@ -3155,17 +3163,22 @@ EC2 instance roles are roles that an instance can assume and anything
 running in that instance has the permissions that role grants.
 
 Starts with an IAM role with a permissions policy.
-EC2 instance role allows the EC2 service to assume that role.
+IAM Role allows the **EC2 Service** to assume that role.
 
-The **instance profile** is the item that allows the permissions to get
-inside the instance. When you create an instance role in the console,
-an instance profile is created with the same name.
+The **Instance Profile** is the item that allows the permissions to get
+inside the instance !!!
+
+When you create an instance role in the console:
+- an Instance Profile is created out of IAM Role with the same name
+- then the **Instance Profile is attached to the Instance itself**
+
 
 When IAM roles are assumed, you are provided temporary roles based on the
 permission assigned to that role. These credentials are passed through
 instance **meta-data**.
 
-EC2 and the secure token service ensure the credentials never expire.
+**EC2 and the secure token service ensure the Role credentials never expire !!!**
+- the credentials are automatically renewed
 
 Key facts
 
@@ -3173,19 +3186,38 @@ Key facts
   - iam/security-credentials/role-name
   - automatically rotated - always valid
   - Resources need to check the meta-data periodically
-- Should always use roles compared to storing long term credentials
-- CLI tools use role credentials automatically
+- **Should always use Roles compared to storing long term credentials (Access Keys)**
+- CLI tools use Role credentials automatically
+  - after the Role is attached to an instance, it can run aws commands without the need to run `aws configure`
 
-### AWS System Manager Parameter Store
+
+How to create and use EC2 Role:
+- go to IAM service
+- click Create role
+- pick "AWS service" as type of trusted entity
+- pick "EC2" as use case
+- pick access type, e.g. AmazonS3FullAcccess
+- go to EC2 service
+- right click on an instance, go to Instance Settings, then Attach/Replace IAM Role
+- select previously created IAM Role
+- now we can run e.g. `aws s3 ls`
+  - if we run `curl http://169.254.169.254/latest/meta-data/iam/security-credentials` it will list of active Roles
+
+
+### AWS System Manager Parameter Store (SSM Paramater Store)
+
+Subproduct of System Manager service.
 
 Passing secrets into an EC2 instance is bad practice because anyone
 who has access to the meta-data has access to the secrets.
 
 Parameter store allows for storage of **configuration** and **secrets**
-
-- Strings
-- StringList
-- SecureString
+- String, StringList, SecureString
+- License codes, Database Strings, Full Configs, Passwords
+- Hierarchies, Versioning
+  - **Hierarchy means we set parameter names according to /... format, e.g. `/my-cat-app/dbstring`**
+  - think of paramater names as filenames in a directory structure
+- Plaintext and Ciphertext
 
 Parameter Store:
 
@@ -3201,21 +3233,38 @@ to be an AWS public service.
 parameter store.
 - Tied closely to IAM, can use
   - Long term credentials such as access keys.
-  - Short term use of IAM roles.
+  - Short term use of IAM roles
+
+
+Retrieve parameter and its value: `aws ssm get-parameters --names /my-cat-app/dbstring --profile iamadmin-general`
+- will get json with Name, Type, Value, Version, LastModifiedDate, ARN
+- encrypted value will be presented as encrypted
+- if we use `--with-decryption`, then encrypted parameter values will be decrypted (same for command below)
+
+
+Retrieve entire hierarchy: `aws ssm get-parameters-by-path --path /my-cat-app/ --profile iamadmin-general`
+- will get json with all parameters in that hierarchy
 
 ### System and Application Logging on EC2
 
-CloudWatch and CloudWatch Logs cannot natively capture data inside an instance.
+Remember:
+- CloudWatch is for metrics
+- CloudWatch Logs is a subset of CloudWatch, aimed at storing, managing and visualizing any logging data
+- CloudWatch and CloudWatch Logs **cannot natively capture data inside an EC2 instance**
 
-CloudWatch Agent is required for OS visible data. It sends this data into CW
-For CW to function, it needs configuration and permissions in addition
+**CloudWatch Agent** is required for OS visible data. It sends this data into CW.
+
+
+For CW to function, it needs **configuration and permissions** in addition
 to having the CW agent installed.
+
+
 The CW agent needs to know what information to inject into CW and CW Logs.
 
 The agent also needs some permissions to interact with AWS.
-This is done with an IAM role as best practice.
-The IAM role has permissions to interact with CW logs.
-The IAM role is attached to the instance which provides the instance and
+- **This is done with an IAM role as best practice.**
+- The IAM role has permissions to interact with CW logs.
+- The IAM role is attached to the instance which provides the instance and
 anything running on the instance, permissions to manage CW logs.
 
 The data requested is then injected in CW logs.
@@ -3223,7 +3272,25 @@ There is one log group for each individual log we want to capture.
 There is one log stream for each group for each instance that needs
 management.
 
-We can use parameter store to store the configuration for the CW agent.
+We can use **Parameter Store** to store the configuration for the CW agent as a parameter.
+
+To use CW Agent and Logs:
+- connect to EC2 Instance
+- download CW Agent .rpm file
+- install it
+- attach IAM Role to the Instance
+  - give it CloudWatchAgentServerPolicy and AmazonSSMFullAccess
+- run Configuration Wizard for CW Agent (`sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard`)
+  - should be fine with mostly default options in the wizard
+  - provide log file paths (e.g. /var/log/httpd/error_log)
+  - the config file will be located at `/opt/aws/amazon-cloudwatch-agent/bin/config.json`
+  - ... but we can also set to store the config in SSM parameter store - by default this is set to true in the Config Wizard
+  - the config .json file stored in SSM can be later used for future instances
+- CW Agent expects dir to exist: /usr/share/collectd/ and file: /usr/share/collectd/types.db
+- run the cloudwatch-agent-ctl with proper parameters (point to config stored in SSM)
+- we can then go to CW -> Logs -> Log groups -> find our group (for each log file path, e.g. /var/log/httpd/error_log) and Log Stream inside it - logs will be there
+
+
 
 ### EC2 Placement Groups
 
@@ -3233,114 +3300,138 @@ Pack instances close together
 
 Achieves the highest level of performance available with EC2.
 
-Best practice is to launch all of the instances within that group at the
-same time.
+
 If you launch with 9 instances and AWS places you in a place with capacity
 for 12, you are now limited in how many you can add.
+- Best practice is to launch all of the instances within that group at the
+same time.
+
 
 Cluster placements need to be part of the same AZ. Cluster
 placement groups are generally the same rack, but they can even be the same
 EC2 host.
 
 All members have direct connections to each other. They can achieve
-**10 Gbps single stream** vs 5 Gbps normally. They also have the lowest
-latency and max PPS possible in AWS.
+**10 Gbps single stream** vs 5 Gbps normally. Thanks to the close physical location, they also have the lowest
+latency and max PPS (Packets per second) possible in AWS.
 
 If the hardware fails, the entire cluster will fail.
 
 ##### Cluster Placement Exam PowerUp
 
-- Clusters can't span AZs. The first AZ used will lock down the cluster.
+- Clusters can't span multiple AZs. ONE AZ ONLY. The first AZ used will lock down the cluster.
 - They can span VPC peers.
 - Requires a supported instance type.
-- Best practice to use the same type of instance and launch all at once.
-- This is the only way to achieve **10Gbps SINGLE stream**, other data metrics
+- Best practice is to use the same type of instance and launch all at once.
+- This is the only way to achieve **10Gbps SINGLE stream !!!**, other data metrics
 assume multiple streams.
+
 
 #### Spread Placement
 
 Keep instances separated
 
 This provides the best resilience and availability.
-Spread groups can span multiple AZs. Information will be put on distinct
-racks with their own network or power supply. There is a limit of 7 instances
-per AZ. The more AZs in a region, the more instances inside a spread placement
+Spread groups can span **multiple AZs**.
+- distinct racks
+- if a rack fails, it will only affect instances inside of it
+
+
+Information will be put on distinct
+racks with their own network or power supply. **There is a limit of 7 instances per AZ** The more AZs in a region, the more instances inside a spread placement
 group.
+
 
 ##### Spread Placement Exam PowerUp
 
 - Provides the highest level of availability and resilience.
-  - Each instance by default runs from a different rack.
+  - **Each instance by default runs from a different rack - it has separated part of hardware**
 - 7 instances per AZ is a hard limit.
 - Not supported for dedicated instances or hosts.
 
 Use case: small number of critical instances that need to be kept separated
-from each other. Several mirrors of an application
+from each other. **Several mirrors of an application**
+
+
 
 #### Partition Placement
 
-Groups of instances spread apart
+Groups (partitions) of instances spread apart
+
+Designed for situations **when we have more than 7 instances per AZ**, but we still require ability to **separate those instances**
+
+Partition Placement group can be created across multiple AZs in a Region.
+- e.g. AZ-A and AZ-B
+- **maximum of 7 partitions per AZ**
+- each partition has its **own racks - no sharing between partitions**
+- 
 
 If a problem occurs with one rack's networking or power, it will
 at most take out one instance.
 
-The main difference is you can launch as many instances in each partition
-as you desire.
+
+The main difference to Spread is you can launch **as many instances as we want** in each partition.
 
 When you launch a partition group, you can allow AWS decide or you can
 specifically decide.
 
+
+
 ##### Partition Placement Exam PowerUp
 
-- 7 partitions maximum for each AZ
-- Instances can be placed into a specific partition, or AWS can pick.
-- This is not supported on dedicated hosts.
+- 7 **partitions** maximum for each AZ
+  - Spread is basically hardcoded 1 AZ per each partition (so limit of 7 instances per AZ still applies)
+- Instances can be placed into a **specific partition, or AWS can pick**.
+  - so we have an element of control
+- This is not supported on Dedicated Hosts.
 - Great for HDFS, HBase, and Cassandra
+
+
+
 
 ### EC2 Dedicated Hosts
 
-EC2 host allocated to you in its entirety.
-Pay for the host itself which is designed for a family of instances.
-There are no instance charges.
-You can pay for a host on-demand or reservation with 1 or 3 year terms.
-
-The host hardware has physical sockets and cores. This dictates how
-many instances can be run on the HW.
+- EC2 host allocated to you in its entirety.
+- **Pay for the entire host** itself which is **designed for a family of instances**.
+- **There are no instance charges.**
+- You can pay for a host **on-demand** or **reservation with 1 or 3 year terms**.
+- Host hardware has **physical sockets and cores**. This dictates how many instances can be run on the HW.
 
 Hosts are designed for a specific size and family. If you purchase one host, you
-configure what type of instances you want to run on it. With the older VM
-system you cannot mix and match. The new Nitro system allows for mixing and
-matching host size.
+configure what type of instances you want to run on it. With the **older VM**
+system you **cannot mix and match**. The new **Nitro** system **allows for mixing and matching host size**.
 
 #### Dedicated Hosts Limitations
 
-- AMI Limits, some versions can't be used
-- Amazon RDS instances are not supported
-- Placement groups are not supported for dedicated hosts.
-- Hosts can be shared with other organization accounts using **RAM**
-- This is mostly used for licensing problems related to ports.
+- **AMI Limits**, some versions (RHEL, SUSE Linux, any Windows AMIs) can't be used
+- **Amazon RDS** instances are not supported
+- **Placement Groups** are not supported for dedicated hosts.
+- Hosts can be shared with other organization accounts using **RAM** - Resource Access Management
+- This is mostly used for software licensing problems (??? read more on that)
 
 ### Enhanced Networking
 
-Enhanced networking uses SR-IOV.
-The physical network interface is aware of the virtualization.
-Each instance is given exclusive access to one part of a physical network
-interface card.
+- Enhanced networking uses **SR-IOV**
+  - **the physical network interface is aware of the virtualization !!!**
+- Each instance is given exclusive access to one of the logical network cards created from physical network card
 
-There is no charge for this and is available on most EC2 types.
-It allows for higher IO and lower host CPU usage
-This provides more bandwidth and higher packet per seconds.
-In general this provides lower latency.
+- There is **no charge** for this and is available on most EC2 types (modern ones mostly).
+  - in many cases it's enabled by default
+- It allows for **higher IO** and **Lower Host CPU** usage
+- This provides more **Bandwidth** and higher PPS (Packets per second).
+- Provides **consistent (!!!) lower latency**.
+- for exam, we don't need to know how to implement it
 
 #### EBS Optimized
 
 Historically network on EC2 was shared with the same network stack used
 for both data networking and EBS storage networking.
 
-EBS optimized instance means that some stack optimizations have taken place
-and dedicated capacity has been provided for that instance for EBS usage.
+EBS optimized instance means that some **stack optimizations** have taken place
+and **dedicated capacity** has been provided for that instance for EBS usage.
 
-Most new instances support this and have this enabled by default for no charge.
+**Most** new instances **support this** and have this **enabled by default** for no charge.
+- for older instance types, there is some support, but enabling costs extra
 
 ---
 
