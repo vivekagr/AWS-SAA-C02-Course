@@ -3165,7 +3165,7 @@ running in that instance has the permissions that role grants.
 Starts with an IAM role with a permissions policy.
 IAM Role allows the **EC2 Service** to assume that role.
 
-The **Instance Profile** is the item that allows the permissions to get
+The **Instance Profile !!!!!** is the item that allows the permissions to get
 inside the instance !!!
 
 When you create an instance role in the console:
@@ -3319,7 +3319,7 @@ If the hardware fails, the entire cluster will fail.
 
 ##### Cluster Placement Exam PowerUp
 
-- Clusters can't span multiple AZs. ONE AZ ONLY. The first AZ used will lock down the cluster.
+- Clusters can't span multiple AZs. **ONE AZ ONLY !!!!!!!!!!**. The first AZ used will lock down the cluster.
 - They can span VPC peers.
 - Requires a supported instance type.
 - Best practice is to use the same type of instance and launch all at once.
@@ -3363,7 +3363,7 @@ Designed for situations **when we have more than 7 instances per AZ**, but we st
 Partition Placement group can be created across multiple AZs in a Region.
 - e.g. AZ-A and AZ-B
 - **maximum of 7 partitions per AZ**
-- each partition has its **own racks - no sharing between partitions**
+- each partition has its **own racks !!!!!!!!!!! - no sharing between partitions**
 - 
 
 If a problem occurs with one rack's networking or power, it will
@@ -3386,6 +3386,10 @@ specifically decide.
 - This is not supported on Dedicated Hosts.
 - Great for HDFS, HBase, and Cassandra
 
+
+Example question:
+If you run a large application which uses 100's of EC2 instances and it needs exposure to physical location for performance and availability reasons. Which placement group should you use.
+- answer: Partition (each partition has own racks)
 
 
 
@@ -3417,7 +3421,7 @@ system you **cannot mix and match**. The new **Nitro** system **allows for mixin
 
 - There is **no charge** for this and is available on most EC2 types (modern ones mostly).
   - in many cases it's enabled by default
-- It allows for **higher IO** and **Lower Host CPU** usage
+- It allows for **higher IO (Throughput)** and **Lower Host CPU** usage
 - This provides more **Bandwidth** and higher PPS (Packets per second).
 - Provides **consistent (!!!) lower latency**.
 - for exam, we don't need to know how to implement it
