@@ -3443,9 +3443,10 @@ and **dedicated capacity** has been provided for that instance for EBS usage.
 
 ### Public Hosted Zones
 
-A hosted zone is a DNS database for a given section of global DNS data.
-A public hosted zone is a type of R53 hosted zone which is hosted on
-R53 provided public DNS name servers. When creating a hosted zone, AWS provides
+- **R53 Hosted Zone** - a **DNS database** for a given section of global DNS data (e.g. animals4life.org)
+- **R53 Public Hosted Zone** -a type of R53 Hosted Zone which is hosted on
+R53-provided **public DNS name servers**.
+- when creating a hosted zone, AWS provides
 at least 4 DNS name servers which host the zone.
 
 This is globally resilient service due to multiple DNS servers.
@@ -3461,92 +3462,127 @@ any queries made to that service.
 
 Hosted Zones are what the DNS system references via delegation and name server
 records. A hosted zone, when referenced in this way by the DNS system, is known
-as being authoritative for a domain.
+as being **authoritative** for a domain.
 It becomes the single source of truth for a domain.
+
+
+How it works (R53 and Public Hosted Zones)?
+- we have a DNS Client (device / server within the ISP) - they query `www.animals4life.org`
+- they move through the DNS tree
+- at some point DNS client gets the IP addresses of R53 Name Servers to use for this particular domain
+  - so Client queries the R53 Name Servers looking for a particular record
+  - there's at least 4 name servers distributed globally for each R53 domain
+- the R53 Name Servers then locate the `animals4life.org` zone file/database, on which **Hosted Zone** is stored
+  - this is just a database containing records
+  - e.g. `A` records for www
+- this data is accessed and passed back through the R53 Name Servers all the way back to DNS Client
 
 ### Route 53 Health Checks
 
-Route checks will allow for periodic health checks on the servers.
-If one of the servers has a bug, this will be removed from the list.
-
-If the bug gets fixed, the health check will pass and the server will be
+- Route checks will allow for periodic health checks on the servers (e.g. if there's A record pointing to EC2 instance, R53 will use health checks to determine the health of that particular target).
+  - If one of the servers has a bug, this will be removed from the list.
+  - If the bug gets fixed, the health check will pass and the server will be
 added back into a healthy state.
 
-Health checks are separate from, but are used by records inside R53.
-You don't create health checks inside records themselves.
 
-These are performed by a fleet of global health checkers. If you think
+- **Health checks are separate from records**, but are used by them (records) inside R53.
+  - You don't create health checks inside records themselves.
+- Checks are performed by a fleet of global health checkers. If you think
 they are bots and block them, this could cause alarms.
 
-Checks occur every 30 seconds by default. This can be increased to 10 seconds
-for additional costs. These checks are per health checker. Since there are many
-you will automatically get one every few seconds. The 10 second option will
-complete multiple checks per second.
+- Checks occur **every 30 seconds by default** (BUT THERE ARE MULTIPLE CHECKERS DOING THE CHECK). This can be increased to **10 seconds for additional costs.**
+  - since there are multiple checkers (around 15) doing the same health check in 30s intervals, it means that on average a health check will be performed every 2-3 seconds
+  - in case of 10s interval, this will result in more than 1 health check per second
 
-There could be one of three checks
 
-- TCP checks: R53 tries to establish TCP with end point within 10 seconds.
-- HTTP/HTTPS: Same as TCP but within 4 seconds. The end point must respond
+Checks could be one of **three types**:
+- **TCP checks**: R53 tries to establish TCP with end point within 10 seconds.
+- **HTTP/HTTPS**: Same as TCP but within 4 seconds. The end point must respond
 with a 200 or 300 status code within 3 seconds of checking.
-- String matching: Same as above, the body must have a string within the first
-5120 bytes. This is chosen by the user.
+- **HTTP/HTTPS with String Matching**: Same as above, the response body must have a string within the first
+5120 bytes. The string is chosen by the user.
 
-It will be deemed healthy or unhealthy.
+It will be deemed **healthy** or **unhealthy**.
 
-There are three types of checks.
-
+There are three types of checks **architecture** (what will be monitored):
 - Endpoint checks
-- CloudWatch alarms
-- Checks of checks
+- CloudWatch Alarm
+- Checks of Checks (multiple calculated checks on application's components)
 
-### Route 53 Routing Policies Examples
+### Route 53 Routing Policies
 
-- Simple: Route traffic to a single resource. Client queries the resolver
-which has one record. It will respond with 3 values and these get forwarded
-back to the client. The client then picks one of the three at random.
-This is a single record only. No health checks.
+- **Simple**: 
+  - Route traffic to a single resource. 
+  - Client queries the resolver which has **one record**. 
+  - ... it will respond with **3 values** (IP addresses) and these get forwarded back to the client
+  - ... the client then picks one of the three at **random**.
+  - This is a **single record only. No health checks !!!**
 
-- Failover: Create two records of the same name and the same type. One
-is set to be the primary and the other is the secondary. This is the same
-as the simple policy except for the response. Route 53 knows the health of
-both instances. As long as the primary is healthy, it will respond with
-this one. If the health check with the primary fails, the backup will be
-returned instead. This is set to implement active - passive failover.
+- **Failover**: 
+  - Create **two records** of the **same name and the same type**. 
+    - One is set to be the primary and the other is the secondary. 
+  - This is the same as the Simple policy except for the **response**. 
+    - Route 53 knows the health of both instances. As long as the primary is healthy, it will respond with this one. If the health check with the primary fails, the secondary (backup) will be returned instead. 
+  - This is set to implement **Active-Passive Failover**: one record is active (primary), other is passive (seconday)
 
-- Weighted: Create multiple records of the same name within the hosted zone.
-For each of those records, you provide a weighted value. The total weight
-is the same as the weight of all the records of the same name. If all of the
-parts of the same name are healthy, it will distribute the load based
-on the weight. If one of them fails its health check, it will be skipped over
-and over again until a good one gets hit. This can be used for migration
-to separate servers.
+- **Weighted**: 
+  - Create **multiple records of the same name** within the hosted zone.
+  - For each of those records, you provide a **weighted value**. 
+    - The total weight is the same as the weight of all the records of the same name. 
+    - If all of the parts of the same name are healthy, it will distribute the load based on the weight. 
+    - If one of them fails its health check, it will be skipped over and over again until a good one gets hit. 
+    - e.g. `www 'A' ip_address (90)` and `www 'A' ip_address2 (10)` - first is chosen 90% of time, second is chosen 10% of time
+  - This can be used for **simple traffic distribution (load balancing)**,  **migration to separate servers by adjusting the weight over time**.
 
-- Latency-based: Multiple records in a hosted zone can be created with
-the same name and same type. When a client request arrives, it knows which
-region the request comes from. It knows the lowest latency and will respond
-with the lowest latency.
+- **Latency-based**:
+  - **Multiple records** in a hosted zone can be created with the same name and same type. 
+    - for each record, we specify region to which it corresponds to
+    - e.g. `www 'A' ip_address (us-east-1)`
+  - When a client request arrives, it knows which **region the request comes from**.
+    - It knows the **lowest latency** and will respond with the lowest latency record.
 
-- Geolocation: Focused to delivering results matching the query of your
-customers. The record will first be matched based on the country if possible.
-If this does not happen, the record will be checked based on the continent.
-Finally, if nothing matches again it will respond with the default response.
-This can be used for licensing rights. If overlapping regions occur,
-the priority will always go to the most specific or smallest region. The US
-will be chosen over the North America record.
+- **Geolocation**: 
+  - Focused to delivering results matching the query of your customers. 
+  - The record will first be matched **based on the country** if possible.
+    - If this does not happen, the record will be checked based on the **continent**.
+    - Finally, if nothing matches again it will respond with the **default** response as long as **default record exists** (otherwise no record will be sent back).
+  - This can be used for **licensing rights**. If **overlapping** regions occur, the priority will always go to the **most specific or smallest region**. 
+    - e.g. The US (country) will be chosen over the North America (continent) record.
 
-- Multi-value: Simple records use one name and multiple values in this record.
-These will be health checked and the unhealthy responses will automatically
-be removed. With multi-value, you can have multiple records with the same
-name and each of these records can have a health check. R53 using this method
-will respond to queries with any and all healthy records, but it removes
-any records that are marked as unhealthy from those responses. This removes
-the problem with simple routing where a single unhealthy record can make it
-through to your customers. Great alternative to simple routing when
-you need to improve the reliability, and it's an alternative to failover
-when you have more than two records to respond with, but don't want
+- **Multi-value**: 
+  - With multi-value, you can have **multiple records** with the **same name** and each of these records can have a health check. 
+  - R53 using this method will respond to queries with any and all healthy records, but it **removes any records that are marked as unhealthy** from those responses. 
+  - This **removes** the problem with simple routing where a **single unhealthy record can make it through to your customers**. 
+  - Great alternative to simple routing when you need to improve the **reliability**, and it's an alternative to failover when you have **more than two records** to respond with, but don't want
 the complexity or the overhead of weighted routing.
 
 ---
+
+### Route 53 Private Hosted Zones
+
+In contrary to Public Hosted Zones, we can also create Private Hosted Zones in R53.
+- we choose what **VPC** they should be associated with
+- these Hosted Zones will be accessible only from within the VPC they are associated with
+- we can associate multiple VPCs with one Private Hosted Zone
+
+
+Useful if we want to create a Hosted Zone accessible only within our company.
+- e.g. our intranet
+
+
+If we have overlapping records in both Public and Private Hosted Zones, the **private would take precedence over public**.
+- for these records, we would have the same domain name
+- but they would point to different IP addresses
+
+---
+
+### Route 53 Exam tips
+
+- Question: Which type of recordset is generally used to point at AWS resources?
+- Answer: A + Alias
+
+
+Memorize the Routing Policies.
 
 ## Relational-Database-Service-RDS
 
