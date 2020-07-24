@@ -4195,13 +4195,14 @@ Schema Conversion Tool or SCT can perform conversions between database types.
 
 EFS moves the instances closer to being stateless.
 
+- **runs inside VPC**
 - EFS is an implementation of NFSv4
 - EFS file systems are created and mounted in Linux.
 - EFS storage exists separately from an EC2 instance like EBS does.
   - EBS is block storage
   - EFS is file storage
 - Media can be shared between many EC2 instances.
-- EFS is a private service.
+- EFS is a **private service**.
   - Isolated to the VPC its provisioned into.
   - Access is via mount targets inside the VPC.
 - EFS access outside of the VPC with
@@ -4214,26 +4215,25 @@ EFS moves the instances closer to being stateless.
 EFS runs inside a VPC. Inside EFS you create file systems and these use POSIX
 permissions. EFS is made available inside a VPC via mount targets.
 Mount targets have IP addresses taken from the IP address range of the
-subnet they're inside. For HA, you need to make sure that you put mount
-targets in each AZ the system runs in.
+subnet they're inside. **For HA, you need to make sure that you put mount targets in each AZ the system runs in.**
 
 You can use hybrid networking to connect to the same mount targets.
 
 #### EFS Exam PowerUp
 
-- EFS is Linux Only
+- EFS is **Linux Only**
 - Two performance modes:
-  - General purpose is good for latency sensitive use cases.
+  - **General purpose** is good for latency sensitive use cases.
     - General purpose should be default for 99.9% of uses.
-  - Max I/O performance mode can scale to higher levels of aggregate t-put
+  - **Max I/O performance** mode can scale to higher levels of aggregate t-put
   and IOPS but it does have increased latencies.
 - Two t-put modes:
   - Bursting works like GP2 volumes inside EBS with a burst pool.
-  The more data you store in the FS, the better performance you get.
+  **The more data you store in the FS, the better performance you get**.
   - Provisioned t-put modes can specify t-put requirements separately from size.
 - Two storage classes available:
   - Standard
-  - Infrequent access
+  - IA - Infrequent Access
   - Can use lifecycle policies to move data between classes.
 
 ---
@@ -4260,7 +4260,7 @@ The user connects to a load balancer that is set to listens on port 80 and 443.
 Within AWS, the configuration for which ports the load balancer listens on is
 called a **listener**.
 
-The user is connected to the load balancer and not the actual server.
+**The user is connected to the load balancer and not the actual server !!!**
 
 Behind the load balancer, there is an application server.
 At a high level when the user connects to the load balancer, it distributes
@@ -4276,7 +4276,8 @@ Clients shouldn't see errors that occur with one server.
 
 #### LB Exam PowerUp
 
-- Clients connect to the **listener** of the load balancer.
+- Clients connect to the Load Balancer
+  - specifically to the **listener** of the Load Balancer
 - The load balancer connects to one or more **targets** or servers.
 - Two connections in play.
   - Listener connection: one connection between the client and listener.
@@ -4296,28 +4297,26 @@ Capacity that you have as part of an ALB increases automatically based
 on the load which passes through that ALB. This is made of multiple ALB nodes
 each running in different AZs. This makes them scalable and highly available.
 
-Load balancing can be internet facing or internal.
+Load balancing can be **internet facing** or **internal.**
 The difference is whether the nodes of the LB, the things which
 run in the AZs have public IP addresses or not.
-
-Internet facing LB is designed to be connected to, from public internet based
+- Internet facing LB is designed to be connected to, from public internet based
 clients, and load balance them across targets.
-
-Internal load balancer is not accessible from the internet and is used to load
+- Internal load balancer is not accessible from the internet and is used to load
 balance inside a VPC only.
 
 Load balancer sits between a client and one or more servers.
 Front end or listening side, accepts connections from a client.
 Back end is used for distribution to the targets.
 
-LB billed on hourly rate and **Load Balancer Capacity Unit** LCU.
+LB billed on hourly rate and **Load Balancer Capacity Unit** (LCU).
 LCU that you consume is based on the highest value for all of the
 individual measurements. You pay a certain number of LCUs based on your
 load over that hour.
 
 #### Cross zone load balancing
 
-Each node that is part of the load balancer is able to distribute load
+Each node (which reside in an AZ) that is part of the load balancer is able to distribute load
 across all instances across all AZ that are registered with that LB,
 even if its not in the same AZ. It is the reason we can achieve a balanced
 distribution of connections behind a load balancer.
@@ -4325,10 +4324,11 @@ distribution of connections behind a load balancer.
 It can also provide health checks on the target servers.
 If all instances are shown as healthy, it can distribute evenly.
 
-ALB can support a wide array of targets. Targets are grouped within target
-groups and an individual target can be a member of multiple groups. It's the
-groups which ALBs distribute connections to. You could create rules
-to direct traffic to different Target Groups based on their DNS.
+ALB can support a wide array of targets. Targets are grouped within **target groups** and an individual target can be a member of multiple groups !!!. 
+- **It's the groups which ALBs distribute connections to**. 
+- You could create rules to direct traffic to different Target Groups based on **host rules** and **path rules**.
+  - host rules use different **DNS names**
+  - path rules can interpret different paths in the HTTP address
 
 #### ALB Exam PowerUp
 
@@ -4338,8 +4338,8 @@ towards.
 - Rules are
   - path based `/cat` or `/dog`
   - host based if you want to use different DNS names.
-- Support EC2, EKS, Lambda, HTTPS, HTTP/2 and websockets.
-- ALB can use SNI for multiple SSL certs attached to that LB.
+- Support EC2, EKS, Lambda, HTTPS, HTTP/2 and Websockets.
+- ALB can use SNI (Server Name Indication) for multiple SSL certs attached to that LB.
   - LB can direct individual domain names using SSL certs at different target
   groups.
 - AWS does not suggest using Classic Load Balancer (CLB), these are legacy.
