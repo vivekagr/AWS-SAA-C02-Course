@@ -3627,6 +3627,13 @@ So long as every key is unique, there is no real schema or structure needed.
 These are really fast and highly scalable.
 This is also used for **in memory caching**.
 
+
+In **exam**, Key-Value databases could be chosen as solution for:
+- **simple requirements**
+- data, which is just **names and values**, or pairs, or keys and values
+- **no structure** necessary
+- scalable, really fast
+
 ##### Wide Column Store
 
 DynamoDB is an example of wide column store database.
@@ -3639,10 +3646,20 @@ sort or range key.
 It can be **single key** (only partition key) or **composite key**
 (partition key and sort key).
 
-Every item in a table can also have attributes, but they don't have to be
-the same between values.
-The only requirements is that every item inside the table has to use the same
-key structure and it has to have a unique key.
+
+- example: **DynamoDB**
+
+
+**Each set of single/composite keys has to be unique**
+
+Every item in a table can also have attributes, but **they don't have to be the same between values**.
+- **any item can have any attribute** (or even no attribute at all)
+- but **every item has to use the same key structure**, and the key has to be **unique**
+
+
+Advantages:
+- very fast, super scalable
+- as long as we don't need SQL commands, it's great for large scale projects
 
 ##### Document
 
@@ -3654,11 +3671,15 @@ contents are exposed to the database allowing you to interact with it.
 
 Good for order databases, or collections, or contact stale databases.
 
-Great for nested data items within a document structure such as user profiles.
+Great for nested data items (deep attribute interactions) within a document structure such as catalogs, user profiles.
 
-##### Row Database (MySQL)
+##### (SQL) Row Store Database (MySQL)
+
+We interact with data based on rows.
 
 Often called OLTP (Online Transactional Processing Databases).
+- as name suggests, they're perfect for systems which perform transactions
+  - e.g. order databases, contact databases
 
 If you needed to read the price of one item you need that
 row first. If you wanted to query all of the sizes of every order, you will
@@ -3667,22 +3688,29 @@ need to check for each row.
 Great for things which deal in rows and items where they are constantly
 accessed, modified, and removed.
 
-##### Column Database (Redshift)
+##### Column Store Database (Redshift)
 
 Instead of storing data in rows on disk, they store it based on columns.
 The data is the same, but it's grouped together on disk, based on
 column so every order value is stored together, every product item, color,
 size, and price are all grouped together.
 
-This is bad for transactional style processing, but great for reporting or when
-all values for a specific size are required.
+This is **VERY VERY INEFFICIENT for transactional style processing**, but great for **reporting-style querying !!!** or when
+all values for a specific column are required.
+- e.g. collect data of all sizes (all `size` column values) to check which size was sold the most
+
+
+Example: Redshift
+- Redshift is a **data-warehousing product**
+  - the name gives it away
+- generally we would take data from Row Store database, shift it into Column Store database and perform **reporting or analytics !!!!!**
 
 ##### Graph
 
-Relationships between things are formally defined and stored along in the
-database itself with the data.
-They are not calculated each and every time you run a query.
-These are great for relationship driven data.
+- Relationships between things are **formally defined** and stored along in the **database itself** with the data.
+- They are **not calculated each and every time you run a query**.
+- These are great for relationship driven data.
+  - e.g. social media sites
 
 Nodes are objects inside a graph database. They can have properties.
 
@@ -3693,6 +3721,13 @@ We might want to store the start date of any employment relationship.
 
 Can store massive amounts of complex relationships between data or between
 nodes in a database.
+
+Is much faster compared to Relational Databases, because in Relational Databases the relations have to be retrieved and computed. Whereas in Graph databases the relations are stored directly with data, and the related data can be retrieved right away.
+
+Exam:
+- when implementing social media
+- when implementing complex relationships
+
 
 ### Databases on EC2
 
@@ -3745,25 +3780,63 @@ RDS uses standard database engines so you can access an RDS instance using the
 same tooling as if you were accessing a self-managed database.
 
 The database can be optimized for:
-
-db.m5 general
-db.r5 memory
-db.t3 burst
+- db.m5 general
+- db.r5 memory
+- db.t3 burst
 
 There is an associated size and AZ selected.
 
-When you provision an instance, you provision dedicated storage to that instance.
-This is EBS storage located in the same AZ.
-RDS is vulnerable to failures in that AZ.
+When you provision an instance, you provision dedicated EBS storage to that instance.
+- This EBS storage is located in the same AZ.
+- RDS is vulnerable to failures in that AZ.
 
-The storage can be allocated with SSD or magnetic.
 
-io1 - lots of IOPS and consistent low latency
-gp2 - same burst pool architecture as it does on EC2, used by default
-magnetic - compatibility mostly for long term historic uses
+The storage can be allocated with SSD (io1, gp2) or magnetic.
+- io1 - lots of IOPS and consistent low latency
+- gp2 - same burst pool architecture as it does on EC2, used by default
+- magnetic - compatibility mostly for long term historic uses
 
-Billing is per instance and hourly rate for that compute. You are billed
-for storage allocated.
+
+Billing is per instance and hourly rate for CPU and memory. You are also billed for storage allocated.
+
+**Rules for RDS Instance in a VPC !!!**:
+- the VPC we use for our RDS Instance must have **at least two subnets**
+- these subnets must be in two different AZs
+- if we want our RDS Instance to be publicly accessible, we need to enable VPC attributes: **DNS hostnames** and **DNS resolution**
+- **DB subnet group** is a collection of subnets (typically private) that we create in a VPC and that we then designate for our DB instances
+- each DB subnet group should have **subnets in at least two AZs** (to avoid losing everything on one AZ failure)
+- if a primary DB instance of a Multi-AZ deployment fails, Amazon RDS can promote the corresponding **standby in another AZ** and then create a new standby using an IP address of the subnet in one of the other AZs
+- when Amazon RDS creates a DB instance in a VPC, **it assigns a network interface to our DB instance by using an IP address from our DB subnet group !!!**
+  - however, we should use DNS name to connect to our database because the underlying IP address changes during failover
+
+
+How it works (migration from self-managed EC2 database server to RDS)?
+- go to **RDS**
+  - go to **Subnet Groups** & create new DB Subnet Group
+    - select your VPC
+    - in subnet section, pick all subnets that you have created for DB purposes (i.e. one subnet in each AZ)
+  - go to **Databases** & create new Database
+    - pick database server (e.g. MariaDB)
+    - pick template (Production, Dev/Test, Free tier)
+    - set username and password
+    - pick instance size
+    - pick allocated storage size (e.g. 20 GiB), check if "Enable storage autoscaling" is enabled if it's needed
+    - set Multi-AZ deployment if needed (creates a standby instance in a **different AZ**) - this is not covered under free tier
+    - select your VPC
+    - under "Additional connectivity configuration", pick the Subnet Group created in previous step
+    - we can set if the instance will be publicy accessible or not (default is no)
+  - once Database is created:
+    - go into details -> Security Groups -> edit SG
+      - **by default, it will only allow traffic on DB's port for one source: our public IP (one we're logged in to AWS console)**
+      - edit inbound rules
+      - remove our public IP, instead set "Custom" and pick our VPC Security Group. Save changes
+    - go into details and save the Endpoint (URL)
+- SSH into our EC2 Instance
+  - make a dbdump of database
+  - connect to new RDS Instance (using the URL copied previously) and put dbdump in it
+  - change configuration of your app to use this RDS Instance
+- now we can get rid of EC2 database server
+
 
 ### RDS Multi AZ (High-Availability)
 
@@ -3775,8 +3848,8 @@ its own storage in the same AZ as it's located.
 RDS enables synchronous replication from the primary instance to the
 standby replica.
 
-RDS Access ONLY via database CNAME. The CNAME will point at the primary
-instance. You cannot access the standby replica for any reason via RDS.
+**RDS Access ONLY via database CNAME**. **The CNAME will point at the primary instance. You cannot access the standby replica for any reason via RDS.**
+
 
 The standby replica cannot be used for extra capacity.
 
@@ -3784,21 +3857,21 @@ The standby replica cannot be used for extra capacity.
 
 1. Database writes happen.
 2. Primary database instance commits changes.
-3. Same time as the write is happening, standby replication is happening.
+3. **Same time as the write is happening, standby replication is happening**.
 4. Standby replica commits writes.
 
 If any error occurs with the primary database, AWS detects this and will
-failover within 60 to 120 seconds to change to the new database.
+failover within 60 to 120 seconds and change to the new database.
 
-This does not provide fault tolerance as there will be some impact during change.
+This **does not provide fault tolerance** as there will be some impact during change.
 
 #### RDS Exam PowerUp
 
-- Multi-AZ feature is not free tier, extra infrastructure for standby.
-  - Generally two times the price.
-- The standby replica cannot be accessed directly unless a fail occurs.
+- Multi-AZ feature is not free tier, **extra infrastructure for standby**.
+  - **Generally two times the price**.
+- The **standby replica cannot be accessed directly unless a fail occurs**.
 - Failover is highly available, not fault tolerant.
-- Same region only (others AZ in the VPC).
+- **Same region only** (others AZ in the VPC).
 - Backups are taken from standby which removes performance impacts.
 - Failover can happen for a number of reasons.
   - Full AZ outage
@@ -3809,21 +3882,32 @@ This does not provide fault tolerance as there will be some impact during change
 
 ### RDS Backup and Restores
 
-RPO - Recovery Point Objective
 
-- Time between the last backup and when the failure occurred.
+https://aws.amazon.com/rds/faqs/
+- Q: What is the difference between automated backups and DB Snapshots?
+
+**Automated backups are enabled by default. DB Snapshots are made manually !!!**
+
+
+RPO - Recovery Point Objective !!!
+
+- **Time between the last backup and when the failure occurred**.
 - Amount of maximum data loss.
+- The lower the value the better, but more expensive
 - Influences technical solution and cost.
 - Business usually provides an RPO value.
 
-RTO - Recovery Time Objective
+RTO - Recovery Time Objective !!!
 
 - Time between the disaster recovery event and full recovery.
+- The lower the value the better, but more expensive
 - Influenced by process, staff, tech and documentation.
 
-RDS Backups
+***RDS Backups**
+- occur from the only instance if we have Single-AZ
+- occur from the standby instance if we have Multi-AZ (Primary instance is never used for backups)
 
-First snap is full copy of the data used on the RDS volume. From then on,
+First snapshot is full copy of the data used on the RDS volume. From then on,
 the snapshots are incremental and only store the change in data.
 
 When any snapshot occurs, there's a brief interruption to the flow of data
@@ -3831,15 +3915,20 @@ between the compute resource and the storage. If you are using single AZ, this
 can impact your application. If you are using Multi-AZ, the snapshot occurs
 on the standby replica.
 
-Manual snapshots don't expire, you have to clean them yourself.
+**Manual snapshots don't expire even after removal of RDS Instance, you have to clean them yourself !!!**
+
+
 Automatic Snapshots can be configured to make things easier.
+- In addition to automated backup, every 5 minutes database transaction logs are
+saved to S3. 
+- Transaction logs store the actual data which changes inside a
+database so the actual operations that are executed. 
+  - Backups are restored and transaction logs are replayed to bring DB to
+desired point in time.
+- This allows a database to be restored to a point in time often with 5 minute granularity.
+- **therefore RPO = 5 minutes for Automatic Snapshots !!!**
 
-In addition to automated backup, every 5 minutes database transaction logs are
-saved to S3. Transaction logs store the actual data which changes inside a
-database so the actual operations that are executed. This allows a database
-to be restored to a point in time often with 5 minute granularity.
-
-Automatic cleanups can be anywhere from 0 to 35 days.
+Retention of automatic backups can be anywhere from 0 to 35 days.
 This means you can restore to any point in that time frame.
 This will use both the snapshots and the translation logs.
 
@@ -3851,26 +3940,30 @@ expire automatically.
 
 #### RDS Backup Exam PowerUp
 
-- When performing a restore, RDS creates a new RDS with a new endpoint address.
+- **When performing a restore, RDS creates a BRAND NEW RDS with a new endpoint address !!!!!**
 - When restoring a manual snapshot, you are setting it to a single point
 in time. This influences the RPO value.
 - Automated backups are different, they allow any 5 minute point in time.
 - Backups are restored and transaction logs are replayed to bring DB to
 desired point in time.
-- Restores aren't fast, think about RTO.
+- **Restores aren't fast, think about RTO**.
 
 ### RDS Read-Replicas
 
 Kept in sync using **asynchronous replication**
+- term **asynchronous replication should always be associated with Read-Replicas !!!**
+- term **synchronuous replication should always be associated with Multi-AZs (Standby replicas) !!!**
 
 It is written fully to the primary and standby instance first.
 Once its stored on disk, it is then pushed to the replica.
-This means there could be a small lag.
-These can be created in the same region or a different region.
-This is known as **cross region replication**. AWS handles all of the
+**This means there could be a small lag.**
+
+
+**These can be created in the same region or a different region. !!!!!!!!!**
+- This is known as **cross region replication**. AWS handles all of the
 encryption, configuration, and networking without intervention.
 
-#### Why do these matter
+#### Why do Read Replicas matter
 
 READ performance
 
@@ -3880,20 +3973,23 @@ READ performance
 - Read-replicas can chain, but lag will become a problem.
 - Can provide global performance improvements.
 - Provides global resilience by using cross region replication.
-- They don't improve RTO
+- **Snapshots and backups don't help much with RTO**
 
-Read Replicas provide near 0 RPO
+- **Read Replicas provide near 0 RPO and low RTO, because they can be promoted quickly !!!**
 
 - If the primary instance fails, you can promote a read-replica to take over.
 - Once it is promoted, it allows for read and write.
-- Only works for failures.
-  - Read-replicas will replicate data corruption.
+- Promotion only happens when there's a failure
+  - Keep in mind, Read-replicas will also replicate data corruption.
+  - if it happens, you can't use them for recovery
   - In this case you must default back to snapshots and backups.
-- Promotion cannot be reversed.
+- **Promotion cannot be reversed !!!**
+  - we have to delete it and create a new Read-Replica
+- Global availability improvements, global resilience
 
 ### Amazon Aurora
 
-Aurora architecture is VERY different from RDS.
+Aurora architecture is VERY different from RDS !!!.
 
 It uses a **cluster** which is:
 
@@ -3909,10 +4005,10 @@ It uses a **cluster** which is:
 Aurora cluster functions across a number of availability zones.
 
 There is a primary instance and a number of replicas.
-The read applications from applications can use the replicas.
+The read queries from applications can use the replicas.
 
-There is a shared storage of **max 64 TiB** across all replicas.
-This uses 6 copies across AZs.
+There is a shared storage of **max 64 TiB** across all replicas (compared to 16 TiB for non-Aurora) !!!!!.
+**Cluster volume uses 6 storage replicas across multiple AZs**.
 
 All instances have access to these storage nodes. This replication
 happens at the storage level. No extra resources are consumed during
@@ -3925,12 +4021,11 @@ Aurora automatically detect hardware failures on the shared storage. If there
 is a failure, it immediately repairs that area of disk and
 recreates that data with no corruption.
 
-With Aurora you can have up to 15 replicas and any of them
-can be a failover target. The failover operation will be quicker because
+**With Aurora you can have up to 15 replicas and any of them can be a failover target**. The failover operation will be quicker because
 it doesn't have to make any storage modifications.
 
 - Cluster shared volume is based on SSD storage by default.
-  - Provides so high IOPS and low latency.
+  - Provides high IOPS and low latency.
   - No way to select magnetic storage.
 - Aurora cluster does not specify the amount of storage needed.
   - This is based on what is consumed.
@@ -3957,31 +4052,33 @@ Minimum endpoints
   - Additional replicas which are used for reads will be load balanced
   automatically.
 
+Custom endpoints can be created as well, pointing at particular primary/read-replica instances.
+- **Therefore Aurora allows much more customization in terms of endpoints compared to regular RDS !!!**
+
 #### Costs
 
 - No free-tier option
 - Aurora doesn't support micro instances
-- Beyond RDS singleAZ (micro) Aurora provides best value.
+- **Beyond RDS singleAZ (micro) Aurora provides best value**
 - Compute is billed per second with a 10 minute minimum.
 - Storage is billed using the high watermark for the lifetime using GB-Month.
   - Additional IO cost per request made to the cluster shared storage.
 - 100% DB size in backups are included for free.
-  - 100 GB cluster will have 100 GB of storage for backups.
+  - 100 GB cluster will have 100 GB of storage for backups as part of what we pay
 
 #### Aurora Restore, Clone and Backtrack
 
-Backups in Aurora work in the same way as RDS.
-Restores create a brand new cluster.
+- Backups in Aurora work in the same way as RDS.
+- **Restores** create a brand new cluster.
+  - similar to how restoring a snapshot creates a new RDS Instance
 
-Backtrack must be enabled on a per cluster basis. This allows you to roll back
-your data base to a previous point in time. This helps for data corruption.
+- **Backtrack** must be enabled on a per cluster basis. 
+  - This allows you to roll back your database to a previous point in time. This helps for **data corruption**.
+  - You can adjust the window backtrack will work for.
 
-You can adjust the window backtrack will work for.
-
-Fast clones make a new database much faster than copying all the data.
-It references the original storage and only write the differences between
-the two. It uses a tiny amount of storage and only stores data that's changed
-in the clone or changed in the original after you make the clone.
+- **Fast clones** make a new database much faster than copying all the data.
+  - It references the original storage and only write the differences between the two. 
+  - It uses a tiny amount of storage and only stores data that's changed in the clone or changed in the original after you make the clone.
 
 ### Aurora Serverless
 
