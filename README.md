@@ -4314,6 +4314,13 @@ LCU that you consume is based on the highest value for all of the
 individual measurements. You pay a certain number of LCUs based on your
 load over that hour.
 
+#### ALB health checks
+
+- can check protocols: HTTP or HTTPS
+- can specify port
+- can specify path (e.g. /path?query)
+
+
 #### Cross zone load balancing
 
 Each node (which reside in an AZ) that is part of the load balancer is able to distribute load
@@ -4351,95 +4358,141 @@ They are documents which allow you to config an EC2 instance in advance.
 Anything you usually define at the point of launching an instance can be
 selected with a Launch Configuration (LC) or Launch Template (LT).
 
-LTs are newer and provide more features than LCs like versioning.
 
-Both of these are not editable. You define them once and that configuration
-is locked.
-If you need to adjust a configuration, you must make a new one and launch it.
+Key concepts:
+- allow you to define the configuration of an EC2 instance **in advance**
+  - AMI, Instance Type, Storage, Key pair
+  - Networking and Security Groups
+  - Userdata & IAM Role
+- both LC and LT are **NOT editable** - defined once
+  - you define them once and that configuration is locked
+  - if you need to adjust a configuration, you must make a new one and launch it
+- LT has versions
+- LT provide **newer features** (everything that LC provide plus more)
+  - T2/T3 Unlimited
+  - Placement Groups
+  - Capacity Reservations
+  - Elastic Graphics
+- LC have **one use** - they are used as part of **Autoscaling Groups !!! EXTREMELY IMPORTANT**
+  - cannot be used to directly launch instances
+  - not editable, no versioning
+- LT also can be used for **Autoscaling Groups !!!**
+  - but they can **also be used to provision EC2 instances from the console UI or CLI** (in contrary to LC)
+- we define VPC for a LT, but not subnet
+  - LT is WHAT, subnet is WHERE
+  - we choose subnet when we launch LT, or subnet is chosen by autoscaling groups
 
-LTs can be used to save time when provisioning EC2 instances
-from the console UI / CLI.
 
 ### Autoscaling Groups
 
-- Automatic scaling and self-healing for EC2
-- They make use of LCs or LTs to know what to provision.
+- **Automatic Scaling** and **Self-Healing** for EC2
+- **They make use of LCs or LTs to know what to provision**
 - Autoscaling group uses one LC or one version of a LT which it's linked with.
 - Three values to control
   - minimum
   - desired
   - maximum
 
-Provision or terminate instances to keep at the desired level
-Scaling Policies can trigger this based on metrics.
+Provision or terminate instances to keep at the **desired** level.
+- **Scaling Policies** automaticcaly adjust the **Desired Capacity** between the MIN and MAX values
 
 Autoscaling Groups will distribute EC2 instances to try and keep the AZs equal.
+- i.e. if there are 3 subnets and desired capacity is 3, then most likely Autoscaling Groups will provision one EC2 instance in each subnet
 
 #### Scaling Policies
 
-Manual Scaling - manually adjust the desired capacity
-Scheduled Scaling - time based adjustments
-Dynamic Scaling
-
-- Simple: If CPU is above 50%, add one to capacity
-- Stepped: If CPU usage is above 50%, add one, if above 80% add three
-- Target: Desired aggregate CPU = 40%, ASG will achieve this
+- **Manual Scaling** - manually adjust the desired capacity
+- **Scheduled Scaling** - time based adjustments
+- **Dynamic Scaling**
+  - Simple: If CPU is above 50%, add one to capacity
+  - Stepped: If CPU usage is above 50%, add one, if above 80% add three - bigger +/- based on difference. Usually preferred over Simple
+  - Target: Desired aggregate CPU = 40%, ASG will handle this
 
 **Cooldown Period** is how long to wait at the end of a scaling action before
 scaling again. There is a minimum billable duration for an EC2 instance.
-Currently this is 300 seconds.
+Currently this is **300 seconds**.
 
-Self healing occurs when an instance has failed and AWS provisions a new
+**Self Healing** occurs when an instance has failed and AWS provisions a new
 instance in its place. This will fix most problems that are isolated to one
 instance.
 
-AGS can use the load balancer health checks rather than EC2.
-ALB status checks can be much richer than EC2 checks because they can monitor
-the status of HTTP and HTTPS requests. This makes them more application aware.
+Autoscaling Groups can work together with Load Balancers
+- ASG instances are automatically added to or removed from the Load Balancer's target group
+- AGS can use the Load Balancer **health checks** rather than EC2
+  - those health checks can be much richer than EC2 health checks, i.e. do HTTP/HTTPS requests (**Application Awareness**)
 
-- Autoscaling Groups are free, only billed for the resources deployed.
-- Always use cool downs to avoid rapid scaling.
-- Try and use more smaller instances to allow granularity.
-- You should use ALB with autoscaling groups.
-- ASG defines when and where, Launch Template defines what.
+
+- **Autoscaling Groups are free**, only billed for the resources deployed.
+- **Always use cooldown periods** to avoid rapid scaling.
+- Try and use **more smaller instances** to allow **granularity**.
+- You should use **Application Load Balancer** with **Autoscaling Groups**
+- Autoscaling Groups defines **WHEN** and **WHERE**, Launch Template / Configuration defines **WHAT** !!!
+
+
+#### Demo - Elastic Wordpress Architecture
+
+- Using:
+  - Launch Template: describe EC2 Instances which will be provisioned by Autoscaling Groups
+  - Autoscaling Group: upsize/downsize instances according to load
+  - Load Balancer: route traffic from clients
+  - infrastracture used in previous demos (VPC, EFS for static webapp contents, RDS for app database)
+
+How to tackle this:
+1. first, implement Launch Template
+2. then, implement the ASG
+3. finally, add a Load Balancer and integrate it with ASG
+
+
+When doing it in CloudFormation, we'd need to have LoadBalancer implemented before Autoscaling Groups.
+- that's because we want to configure Autoscaling Groups to launch instances into Target Group (which is a part of LoadBalancer, in which we specify our VPC's public subnets)
+- once Target Group is created as a part of LoadBalancer (in fact it's Listener), then we can setup our Autoscaling Groups to use this Target Group
 
 ### Network Load Balancer (NLB)
 
 Part of AWS Version 2 series of load balancers.
-NLBs are Layer 4, only understand TCP and UDP.
+NLBs are Layer 4, only understand **TCP and UDP** !!!.
 
 Can't interpret HTTP or HTTPs, but this makes it much faster in latency.
-If you see anything about latency and HTTP and HTTPS are not involved, this
-should default to a NLB.
+**If you see anything about latency and HTTP and HTTPS are not involved, this should default to a NLB**.
 
 There is nothing stopping NLB from load balancing on HTTP just by routing data.
 They would do this really fast and can deliver millions of requests per second.
 
 Only member of the load balancing family that can be provided a static IP.
-There is 1 interface per AZ. Can also use Elastic IPs (whitelisting) and should
-be used for this purpose.
+There is 1 interface per AZ. **Can also use Elastic IPs (whitelisting) and should be used for this purpose.**!!!
+- if we see whitelisting IPs or static IPs in relation to load balancing, then we need to use Network Load Balancer !!!
 
 Can perform SSL pass through.
 
-NLB can load balance non HTTP/S applications, doesn't care about anything
-above TCP/UDP. This means it can handle load balancing for FTP or things
-that aren't HTTP or HTTPS.
+**NLB can load balance non HTTP/S applications, doesn't care about anything above TCP/UDP** !!!
+- it will work with Layer 4 or below
+- this means it can handle load balancing for e.g. FTP
 
 ### SSL Offload and Session Stickiness
 
-#### Bridging - Default mode
+There are three ways Load Balancer can perform **secure connections**:
+- Bridging
+- Pass-through
+- Offload
 
-One or more clients makes one or more connections to a load balancer.
-The load balancer is configured so its **listener** uses HTTPS, SSL connections
-occur between the client and the load balancer.
+#### Bridging - Default mode of Application Load Balancer
 
-The load balancer then needs an SSL certificate that matches the domain name
-that the application uses. AWS has access to this certificate.
-If you need to be careful of where your certificates are stored, you may
-have a problem with this system.
+**Client** ---secure-https--> **ELB (decrypts, analyses, encrypts again - needs SSL cert)** ---secure-https--> **EC2 Instances (decrypts - needs SSL cert and compute resources)**
 
-ELB initiates a new SSL connection to backend instances with a removed
-HTTPS certificate. This can take actions based on the content of the HTTP.
+- One or more clients makes one or more connections to a load balancer.
+- The load balancer is configured so its **listener** uses HTTPS, SSL connections occur between the client and the load balancer.
+
+- The load balancer then needs an **SSL certificate** which matches the domain name that the application uses. 
+  - this is because SSL connections are decrypted (terminated) on the Load Balancer itself
+  - decryption (termination) means that the SSL wrapper is removed from the unencrypted HTTP
+
+- ... then Load Balancer initiates a **new SSL connection** to backend instances
+  - this means it re-encrypts the HTTP with a secure SSL wrapper and deliver it to the EC2 instances
+  - therefore instances also need **SSL certificates**, as well as the **compute** required for **cryptographic operations**
+
+- AWS has access to this certificate.
+  - If you need to be careful of where your certificates are stored, you may have a problem with this system.
+
 
 The application local balancer requires a SSL certificate because it needs
 to decrypt any data that's being encrypted by the client. Once decrypted, it
@@ -4449,54 +4502,60 @@ end EC2 instances. The EC2 instance will need matching SSL certificates.
 Needs the compute for the cryptographic operations. Every EC2 instance must
 perform these cryptographic operations. This overhead can be significant.
 
-The main benefit is the elastic load balancer gets to see the unencrypted
-HTTP and can take actions based on what's contained in this plain text
-protocol.
+The main benefit is the ELB gets to see the unencrypted HTTP and can take actions based on what's contained in this plain text protocol.
 
 #### Pass-through - Network Load Balancer
 
-The client connects, but the load balancer passes the connection along without
-decrypting the data at all. The instances still need the SSL certificates,
-but the load balancer does not. Specifically it's a network load balancer
-which is able to perform this style of connection.
+**Client** ---secure-https--> **ELB (Listener configured for TCP, doesn't decrypt/encrypt, doesn't need SSL cert)** ---secure-https--> **EC2 Instances (decrypts - needs SSL cert and compute resources)**
 
-The load balancer is configured for TCP, it can see the source or destinations,
-but it never touches the encrypted connection. The certificate never
+
+- The client connects, but the load balancer passes the connection along **without decrypting the data at all.**
+  - therefore Load Balancer doesn't need SSL certificates
+  - the instances still need the SSL certificates
+- With this architecture, there is **no certificate exposure to AWS**
+  - all self-managed and secured
+
+
+Specifically it's a **Network Load Balancer** which is able to perform this style of connection.
+
+- The **Listener** is configured for **TCP**, it can see the source or destinations, but it never touches the encrypted connection. The certificate never
 needs to be seen by AWS.
 
-Negative is you don't get any load balancing based on the HTTP part
+Negative is you **don't get any load balancing based on the HTTP part**
 because that is never exposed to the load balancer. The EC2 instances
-still need the compute cryptographic overhead.
+**still need the compute cryptographic overhead**.
 
 #### Offload
 
-Clients connect to the load balancer using HTTPS and are terminated on the
-load balancer. The LB needs an SSL certificate to decrypt the data, but
-on the backend the data is sent via HTTP. While there is a certificate
-required on the load balancer, this is not needed on the LB.
+**Client** ---secure-https-->  **ELB (decrypts, analyses, DOESN'T ENCRYPT AGAIN - needs SSL cert)** ---UNSECURE-HTTP--> **EC2 Instances (no need to decrypt)**
 
-Data is in plaintext form across AWS's network. Not a problem for most.
+- Clients connect to the load balancer using **HTTPS** and **are terminated on the load balancer**.
+- The LB needs an SSL certificate to decrypt the data, but **to the backend the data is sent via HTTP, not HTTPS !!!**. 
+  - so the connections are never encrypted again
+
+- From customer perspective, the data is **encrypted between them and the Load Balancer**
+  - but in transit from the LB to EC2 instances it's in **plaintext form**
+
+While there is a certificate required on the load balancer, this is not needed on the EC2 instances.
+
 
 #### Connection Stickiness
 
-If there is no stickiness, each time the customer logs on they will have
-a stateless experience. If the state is stored on a particular server,
-sessions can't be load balanced across multiple servers.
+- If there is no stickiness, each time the customer logs on they will have a stateless experience. 
+  - **If the state is stored on a particular server, sessions can't be load balanced across multiple servers.**
 
-There is an option available within elastic load balancers called Session
-Stickiness. And within an application load balancer this is enabled on a
-target group. If enabled, the first time a user makes a request, the load
-balancer generates a cookie called AWSALB with a duration. A valid duration
-is between one second and seven days. For this time, sessions will be sent to
-the same backend instance. This will happen until:
+- There is an option available within ELBs called **Session Stickiness**.
+  - Within an application load balancer this is enabled on a **Target Group**. 
+  - if enabled, the first time a user makes a request, the load balancer generates a cookie called AWSALB with a duration we set
+  - A valid duration is between **one second and seven days**. 
+  - **For this time, sessions will be sent to the same backend instance**. 
+  - ... this will happen until one of two things occur:
+    - A **server failure**, then the user will be moved to a different server.
+    - The cookie **expires**, the whole process will repeat and will receive a new cookie
 
-- A server failure, then the user will be moved to a different server.
-- The cookie expires, the whole process will repeat and will receive a
-new cookie
-
-This could cause backend unevenness because one user will always be forced
-to the same server no matter what the distributed load is. Applications
-should be designed to hold session stickiness somewhere other than EC2.
+- the problem with **Session Stickiness** is this could cause **uneven load on backend servers**
+  - one user will always be forced to the same server no matter what the distributed load is. 
+  - **that's why, if possible, applications should be designed to hold Session Stickiness somewhere other than EC2 !!!**
 
 ---
 
