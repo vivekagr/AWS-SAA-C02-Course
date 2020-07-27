@@ -4621,8 +4621,10 @@ processing tier.
 ### AWS Lambda
 
 - Function-as-a-service (FaaS)
+  - key component of **serverless** architecture
   - Service accepts functions.
-- Event driven invocation (execution) based on an event occurring.
+  - functions are executed and we're billed for duration of that execution
+- **Event driven invocation** (execution) based on an **event** occurring.
 - **Lambda function** is piece of code in one language.
 - Lambda functions use a **runtime** (e.g. Python 3.6)
 - Runs in a **runtime environment**.
@@ -4632,44 +4634,43 @@ processing tier.
 
 #### Lambda Architecture
 
-Best practice is to make it very small and very specialized.
-Lambda function code, when executed is known as being **invoked**.
-When invoked, it runs inside a runtime environment that matches the language the
-script is written in.
-The runtime environment is allocated a certain amount of memory and an
-appropriate amount of CPU. The more memory you allocate, the more CPU it gets,
-and the more the function costs to invoke per second.
+- Best practice is to make it **very small** and **very specialized**
+- Lambda function code, when executed is known as being **invoked**.
+  - When invoked, it runs **inside a runtime environment** that matches the language the script is written in.
+- The runtime environment is allocated a certain amount of memory and an appropriate amount of CPU. 
+- The **more memory you allocate, the more CPU it gets**, and the **more the function costs** to invoke per second.
 
-Lambda functions can be given an IAM role or **execution role**.
-The execution role is passed into the runtime environment.
-Whenever that function executes, the code inside has access to whatever
-permissions the role's permission policy provides.
+- Lambda functions can be given an **IAM role**, in this case it's called **Execution Role** (similar how there's Instance Role for EC2)
+  - The execution role is passed into the runtime environment.
+  - Whenever that function executes, the code inside has access to whatever permissions the role's permission policy provides.
 
-Lambda can be invoked in an **event-driven** or **manual** way.
-Each time you invoke a lambda function, the environment provided is new.
-Never store anything inside the runtime environment, it is ephemeral.
 
-Lambda functions by default are public services and can access any websites.
-By default they cannot access private VPC resources, but can be configured
-to do so if needed. Once configured, they can only access resources within a VPC.
-Unless you have configured your VPC to have all of the configuration needed
-to have public internet access or access to the AWS public space endpoints, then
-the Lambda will not have access.
+- Lambda can be invoked in an **event-driven** or **manual** way.
+  - Each time you invoke a lambda function, the environment provided is new.
+  - **Never** store anything inside the runtime environment, it is ephemeral.
 
-The Lambda runtime is stateless, so you should always use AWS services for input
-and output. Something like DynamoDB or S3. If a Lambda is invoked by an event,
-it gets details of the event given to it at startup.
+- Lambda functions by default are **public services** and can **access any websites**
+  - By default they **cannot access private VPC resources**, but **can be configured to do so** if needed. 
+  - Once configured, they can only access resources within a VPC.
+  - Unless you have configured your VPC to have all of the infra/configuration needed
+to allow resources to have public internet access or access to the AWS public space endpoints, then
+the Lambda will not have that access.
 
-Lambda functions can run up to 15 minutes. That is the max limit.
+- The Lambda runtime is **stateless**, so you should **always use AWS services for input and output**
+  - e.g. DynamoDB or S3
+  - If a Lambda is invoked by an event, it gets details of the event given to it at startup.
+
+- Lambda functions can run **up to 15 minutes**. That is the **max limit**!!!!
+  - if the computation is less than 15 minutes, default to using Lambda
 
 #### Key Considerations
 
-- Currently 15 min execution limit.
-- Assume each execution gets a new runtime environment.
-- Use the execution role which is assumed when needed.
-- Always load data from other services from public APIs or S3.
-- Store data to other services (e.g. S3).
-- 1M free requests and 400,000 GB-seconds of compute per month.
+- Currently **15 min execution limit**
+- Assume **each execution** gets a **new runtime environment**
+- Use the **Execution Role** which is assumed when the function is executed
+- Always **load data in and out of other services** (public APIs or AWS services)
+- **Free tier: 1M requests and 400,000 GB-seconds of compute per month**
+- Really **cost-effective**!!!
 
 ### CloudWatch Events and EventBridge
 
@@ -4678,7 +4679,7 @@ products and services. EventBridge will replace CW Events.
 EventBridge can also handle events from third parties. Both share the same
 underlying architecture. AWS is now encouraging a migration to EB.
 
-#### CloudWatch Events Key Concepts
+#### CloudWatch Events and EventBridge Key Concepts
 
 They can observe if X happens at Y time(s), do Z.
 
@@ -4686,95 +4687,97 @@ They can observe if X happens at Y time(s), do Z.
 - Y can be a certain time or time period.
 - Z is a supported target service to deliver the event to.
 
-EventBridge is basically CloudWatch Events V2 that uses the same underlying
-APIs and has the same architecture, but with additional features.
-Things created in one can be visible in the other for now.
 
-Both systems have a default Event bus for a single AWS account.
-A bus is a stream of events which occur for any supported service inside an
-AWS account.
-In CW Events, there is only one bus (implicit), this is not exposed.
-EventBridge can have additional event buses for your applications or third party
-applications and services.
-These can be interacted with in the same way as the default bus.
+- EventBridge is basically CloudWatch Events V2 that uses the same underlying APIs and has the same architecture, but with additional features.
+  - Things created in one can be visible in the other for now.
 
-In both services, you create rules and these rules pattern match events which
-occur on the buses and when they see an event which matches, they deliver
-that event to a target. Alternatively you can have schedule based rules
-which match a certain date and time or ranges of dates and times.
+- Both systems have a default **Event Bus** for a single AWS account.
+  - A bus is a stream of events which occur for any supported service inside an AWS account.
+- **In CW Events, there is only one bus (implicit), this is not exposed.**
+- **CW EventBridge can have additional event buses for your applications or third party applications and services.**
+  - These can be interacted with in the same way as the default bus.
 
-Rules match incoming events or schedules. The rule matches an event and routes
-that event to one or more targets as you define on that rule.
+- In both services, you create **rules**
+  - these rules pattern match events which occur on the buses
+  - when they see an event which matches, they deliver that **event** to a **target**. 
+  - Alternatively you can have **schedule** based rules which match a certain date and time or ranges of dates and times.
 
-Architecturally at the heart of event bridge is the default account event bus.
-This is a stream of events generated by supported services within the AWS
-account. Rules are created and these are linked to a specific event bus
-or the default event bus. Once the rule completes pattern matching, the rule
-is executed and moves that event that it matched through to one or more targets.
-The events themselves are JSON structures and the data can be used by the
-targets.
 
-### Application Programming Interface (API) Gateway
+- Architecturally at the heart of **Event Bridge** is the Default Account **Event Bus**.
+  - This is a **stream of events** generated by supported services within the AWS account. 
+  - Rules are created and these are linked to a specific **Event Bus** or the default Event Bus. 
+  - Once the rule completes pattern matching, the rule is executed and moves that event that it matched through to one or more targets.
+- **The events themselves are JSON structures and the data can be used by the targets.**
+
+### Application Programming Interface API Gateway
 
 - A way applications or services can communicate with each other.
 - API gateway is an AWS managed service.
-  - Provides managed AWS endpoints.
+  - Provides **managed API Endpoint Service**.
   - Can also perform authentication to prove you are who you claim.
   - You can create an API and present it to your customers for use.
-- Allows you to create, publish, monitor, and secure APIs.
+  - it's heavily used in Serverless architectures
+- **Allows you to Create, Publish, Monitor, and Secure APIs ... as a service**
 - Billed based on:
   - number of API calls
-  - amount of data transferred
+  - data transferred
   - additional performance features such as caching
-- Serve as an entry point for serverless architecture.
+- **Serve as an entry point for serverless architecture**
 - If you have on premises legacy services that use APIs, this can be integrated.
 
 Great during an architecture evolution because the endpoints don't change.
 
 1. Create a managed API and point at the existing monolithic application.
 2. Using API gateway allows the business to evolve along the way slowly.
-This might move some of the data to fargate and aurora architecture.
-3. Move to a full serverless architecture with DynamoDB.
+This might involve moving some of the data to Microservice architecture, e.g. Fargate and Aurora.
+3. Move to a full Serverless architecture with e.g. Lambda, DynamoDB.
 
 ### Serverless
 
-This is not one single thing, you manage few if any servers.
-This aims to remove overhead and risk as much as possible.
-Applications are a collection of small and specialized functions that do
-one thing really well and then stop.
+- This is **not one single thing**
+  - it's more about software than hardware
+  - you manage few if any servers - **low overhead**
+- related to Microservice architecture and Event-Driven architecture
+- applications are a collection of small and specialized **functions that do one thing really well and then stop**
 
-These functions are stateless and run in ephemeral environments.
-Every time they run, they obtain the data that they need, they do something
-and then optionally, they store the result persistently somehow or deliver
-the output to something else.
+- these functions are **stateless** and run in **ephemeral environments**
+  - every time they run, they obtain the data that they need, they do something and then optionally, they store the result persistently somehow or deliver the output to something else.
 
-Generally, everything is event driven. Nothing is running until it's required.
-While not being used, there should be little to no cost.
+- generally, everything is Event Driven: **nothing is running until it's required**
+  - while not being used, there should be little to no cost.
 
-Should use managed services when possible.
+- should use **managed services** when possible
+  - shouldn't re-invent the wheel
+  - e.g. stick to S3 for any persistent object storage
 
-Aim is to consume as a service whatever you can, code as little as possible,
-and use function as a service for any general purpose compute needs, and
-then use all of those building blocks together to create your application.
+- aim is to:
+  - consume **as a service** whatever you can
+  - **code as little as possible**
+  - use **FaaS** for any general purpose compute needs
+  - then use all of those building blocks together to create your application.
 
 #### Example of Serverless
 
-A user wants to upload videos to a website for transcoding.
+- A user wants to upload videos to a website for transcoding.
+  - starting position is that we don't use any self-managed services
 
-1. User browses to a static website that is running the uploader. The JS runs
-directly from the web browser.
-2. Third party auth provider, google in this case, authenticates via **token**.
+1. User browses to a S3-hosted static website running the Upload service. The JS runs directly from the web browser
+2. Third party auth provider, Google in this case, authenticates via **token**.
 3. AWS cannot use tokens provided by third parties. **Cognito** is called to
-swap the third party token for AWS credentials.
+swap the third party token (Google) for AWS temporary credentials.
 4. Service uses these temporary credentials to upload a video to S3 bucket.
-5. Bucket will generate an event once it has completed the upload.
-6. A lambda triggers to transcode the video as needed. The
-transcoder will get the original S3 bucket video location and will use
+5. Bucket will **generate an Event** once it has completed the upload.
+6. A lambda function is triggered by the Event, and creates jobs in the **Elastic Transcoder service**. The
+Elastic Transcoder, as part of the initation of the job, will get the original S3 bucket video location and will use
 this for its workload.
-7. Output will be added to a new transcode bucket and will put an entry into
+7. Outputs (e.g. different resolution vids made from the original vid) will be added to a new transcode bucket and will put an entry into
 DynamoDB.
-8. User can interact with another Lambda to pull the media from the
+8. User can interact with another Lambda function to pull the URL of the media from the
 transcode bucket using the DynamoDB entry.
+
+
+No self-managed services (e.g. EC2 instances) were used. The architecture is Serverless, but...
+- generally, **API Gateway** would be used **between any client-side processing** and the **Lambda functions**
 
 ### Simple Notification Service (SNS)
 
