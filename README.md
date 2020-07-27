@@ -4579,7 +4579,8 @@ This is the least cost effective way to architect systems.
 - Different components can be on the same server or different servers.
 - Components are coupled together because the endpoints connect together.
 - Can adjust the size of the server that is running each application tier.
-- Utilizes load balancers in between tiers to add capacity.
+- Utilizes **load balancers** in between tiers
+  - allows **horizontal scaling**
 - Tiers are still tightly coupled.
   - Tiers expect a response from each other. If one tier fails, subsequent
   tiers will also fail because they will not receive the proper response.
@@ -4587,17 +4588,17 @@ This is the least cost effective way to architect systems.
 - Tiers must be operational and send responses even if they are not processing
 anything of value otherwise the system fails.
 
-#### Evolving with Queues
+#### Queues
 
 - Data no longer moves between tiers to be processed and instead uses a queue.
   - Often are **FIFO** (first in, first out)
 - Data moves into a S3 bucket.
 - Detailed information is put into the next slot in the queue.
   - Tiers no longer expect an answer.
-- Upload tier sends an async message.
+- Upload tier sends an **async** message.
   - The upload tier can add more messages to the queue.
-- The queue will have an autoscaling group to increase processing capacity.
-- The autoscaling group will only bring up servers as they are needed.
+- **The queue will have an Autoscaling Group to increase/decrease processing capacity according to the Queue length !!!**
+- The Autoscaling Group will only bring up servers as they are needed.
 - The queue has the location of the S3 bucket and passes this onto the
 processing tier.
 
@@ -4612,9 +4613,10 @@ processing tier.
   - Actions are taken and the system returns to waiting
 - Services can be producers and consumers at once.
 - Resources are not waiting around to be used.
-- Event router is needed for event driven architecture that also manages
-an event bus.
-- Only consumes resources while handling events.
+- **Event Router** is needed for event driven architecture
+  - has an **Event Bus**
+  - Event Router decides which consumers to deliver events to and when that occurs, the actions are taken & **the system returns to waiting (doesn't consume resources)**
+- **Only consumes resources while handling events !!!**
 
 ### AWS Lambda
 
