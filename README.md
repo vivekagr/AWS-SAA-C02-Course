@@ -4782,76 +4782,73 @@ No self-managed services (e.g. EC2 instances) were used. The architecture is Ser
 ### Simple Notification Service (SNS)
 
 - HA, Durable, PUB/SUB messaging service.
-- Public AWS service meaning to access it, you need network connectivity
-with the Public AWS endpoints.
-- Coordinates sending and delivering of messages up to 256KB in size.
+- Public AWS service: to access it, you need network connectivity with the Public AWS endpoints.
+- Coordinates **sending and delivering** of messages up to 256KB in size.
   - Messages are not designed for large binary files.
-- SNS topics are the base entity of SNS.
+- SNS **topics** are the base entity of SNS.
   - Permissions are controlled and configuration for SNS is defined.
-- Publisher sends messages to a topic.
-  - Topics have subscribers which receive messages.
-- Subscribers receive all of the messages sent to the Topic.
-  - Subscribers can be HTTP and HTTPS endpoints, emails, or SQS queues.
+- **Publisher** sends messages to a **topic**.
+  - **Topics** have **subscribers** which receive messages.
+- **Subscribers** receive all of the messages sent to the Topic.
+  - Subscribers can be HTTP and HTTPS endpoints, emails, or **SQS queues**.
   - Filters can be applied to limit messages sent to subscribers.
-- Fanout allows for a single SNS topic with multiple SQS queues as subscribers.
+- **Fanout** allows for a single SNS topic with multiple **SQS queues as subscribers.**
   - Can create multiple related workflows.
   - Allows multiple SQS queues to process the workload in slightly different
   ways.
 
 Offers:
 
-- Delivery Status including HTTP, Lambda, SQS
-- Delivery retries which ensure reliable delivery
-- HA and Scalable (Regional)
-- SSE (server side encryption)
-- Topics can be used cross-account via Topic Policy
+- Delivery **Status** including HTTP, Lambda, SQS
+- Delivery **Retries** which ensure **reliable delivery**
+- HA and Scalable (**Regional**)
+- SSE (server side **encryption**)
+- Topics can be used **cross-account** via resource policy (**Topic Policy**)
 
 ### AWS Step Functions
 
-There are many problems with lambdas limitations that can be solved with
-a state machine. A state machine is a workflow. It has a start point, end point
-and in between there are states. States are things inside a State Machine which
-can do things. States can do things, and take in data, modify data, and output
-data.
+- **Lambda** is FaaS
+  - it runs small, very specific functions
+  - we should never put whole apps in Lambda (bad practice, 15 minute execution limit)
+  - gets messy at scale
+  - runtime environments are **stateless**
+- There are many problems with Lambda limitations that can be solved with a **State Machine**. 
+  - a State Machine is a **workflow**. 
+  - it has a **start point**, **end point** and in between there are **states**. 
+    - states are things inside a State Machine which can do things. 
+    - States can do things, and take in data, modify data, and output data.
 
-State machine is designed to perform an activity or workflow with lots of
-individual components and maintain the idea of data between those states.
+- State machine is designed to perform an **activity or workflow** with **lots of individual components** and maintain the idea of data **between those states**
+- Maximum duration for a state machine execution is **1 year**.
 
-Maximum duration for a state machine execution is 1 year.
+- **Two types** of workflow
+  - **Standard**
+    - Default
+    - 1 year workflow
+  - **Express**
+    - Designed for IOT or other **high transaction uses**
+    - **5 minute workflow**
+    - Provides **better processing guarantees**
 
-Two types of workflow
+- Started via API Gateway, IOT Rules, EventBridge, Lambda. 
+- Generally used for **backend processing**.
 
-- Standard
-  - Default
-  - 1 year workflow
+- With State machines you can use a **template** to create and export State Machines once they're configured to your liking
+  - it's called **Amazon States Language** or **ASL**. It's based on JSON.
 
-- Express
-  - Designed for IOT or other high transaction uses
-  - 5 minute workflow
-  - Provides better processing guarantees
-
-Started via API Gateway, IOT Rules, EventBridge, Lambda. Generally used for
-back end processing.
-
-With State machines you can use a template to create and export State Machines
-once they're configured to your liking, it's called Amazon States Language or
-ASL. It's based on JSON.
-
-State machines are provided permission to interact with other AWS services via
-IAM roles.
+- State machines are provided **permission** to interact with other AWS services via **IAM roles**.
 
 #### Step Function States
 
-States are the things inside a workflow, the things which occur. These states
-are available.
+States are the things inside a workflow, the things which occur. START -> **STATES** -> END
 
-- Succeed and Fail
+- Succeed or Fail
   - the process will succeed or fail.
 - Wait
-  - will wait for a certain period of time
-  - will wait until specific date and time
+  - will wait **for** a certain period of time
+  - will wait **until** specific date and time
 - Choice
-  - different path is determined based on an import
+  - different path is determined **based on an import**
 - Parallel
   - will create parallel branches based on a choice
 - Map
