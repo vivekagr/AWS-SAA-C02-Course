@@ -4781,9 +4781,10 @@ No self-managed services (e.g. EC2 instances) were used. The architecture is Ser
 
 ### Simple Notification Service (SNS)
 
-- HA, Durable, PUB/SUB messaging service.
-- Public AWS service: to access it, you need network connectivity with the Public AWS endpoints.
-- Coordinates **sending and delivering** of messages up to 256KB in size.
+- HA, Durable, **PUB/SUB** messaging service. (**remember that PUB/SUB == SNS !!!**)
+- Public AWS service meaning to access it, you need network connectivity
+with the Public AWS endpoints.
+- Coordinates sending and delivering of messages up to 256KB in size.
   - Messages are not designed for large binary files.
 - SNS **topics** are the base entity of SNS.
   - Permissions are controlled and configuration for SNS is defined.
@@ -4792,7 +4793,7 @@ No self-managed services (e.g. EC2 instances) were used. The architecture is Ser
 - **Subscribers** receive all of the messages sent to the Topic.
   - Subscribers can be HTTP and HTTPS endpoints, emails, or **SQS queues**.
   - Filters can be applied to limit messages sent to subscribers.
-- **Fanout** allows for a single SNS topic with multiple **SQS queues as subscribers.**
+- **SNS + SQS Fanout** allows for a single SNS topic with **multiple SQS queues as subscribers**.
   - Can create multiple related workflows.
   - Allows multiple SQS queues to process the workload in slightly different
   ways.
@@ -4882,75 +4883,120 @@ Public service that provides fully managed highly available message queues.
   - if a message is received multiple times but is unable to be finished, this
   puts it into a different workload to try and fix the corruption.
 - ASG can scale and lambdas can be invoked based on queue length.
-- Standard queue
-  - multi-lane HW
-  - guarantee the order and at least once delivery.
-- FIFO queue
-  - single lane road with no way to overtake
-  - guarantee the order and at exactly once delivery
-  - 3,000 messages p/s with batching or up to 300 messages p/s without
+- types of Queues:
+  - **Standard Queue**
+    - multi-lane highway
+    - **guarantee at least once-delivery**
+    - **no guarantee** on the **order** of that delivery
+    - can scale to near infinite level (use for **decoupling super high volume apps!!!**)
+  - **FIFO Queue**
+    - single lane road with no way to overtake
+    - **guarantee** the **order**
+    - **guarantee** **exactly once delivery**
+    - 3,000 messages p/s with batching or up to 300 messages p/s without
+
+
+**Important for exam!!!: SNS + SQS Fanout**
+- scenario: object being uploaded to an S3 bucket, and there's requirement for spawning **multiple jobs** to process that object
+- S3 buckets are capable of generating an event when an object is uploaded to that bucket
+  - but it can only generate **one event**!!!
+- in order to take that one event and create multiple different events, we'd need to use **SNS + SQS Fanout design**
+  - **SNS + SQS Fanout design** - taking one single SNS topic with multiple subscribers (generally multiple SQS queues) and then this message will be added into each of these **queues**
+  - this would allow for **multiple jobs** to be started **per object upload**
+
+
 
 Billed on **requests** not messages. A request is a single request to SQS.
 One request can return 0 - 10 messages up to 64KB data in total.
 Since requests can return 0 messages, frequently polling a SQS Queue, makes it
 less effective.
 
-Two ways to poll
+Two ways to **poll**
 
 - short (immediate) : uses 1 request and can return 0 or more messages. If the
-queue is empty, it will return 0 and try again. This hurts queues that stay
-short
+queue is empty, it will return 0 and try again.
 
 - long (waitTimeSeconds) : it will wait for up to 20 seconds for messages
-to arrive on the queue. It will sit and wait if none currently exist.
+to arrive on the queue. It will sit and wait for messages if none currently exist.
+  - **we should use long polling, because it uses fewer requests = less expensive**
 
-Messages can live on SQS Queue for up to 15 days. They offer KMS encryption
-at rest. Server side encryption. Data is encrypted in transit with SQS and any
-clients.
 
-Access to a queue is based on identity policies or a queue policy. Queue
-policies only can allow access from an outside account. This is a resource policy.
+
+**Important for exam!!!: what services are commonly used within serverless architectures?**
+- API Gateway
+- Lambda
+- Step Functions
+- S3
+
+trick answer: Kinesis is not commonly used with serverless architectures
+
+
+---
+- Messages can live on SQS Queue for up to 15 days. 
+- They offer **KMS encryption at rest** (server side encryption)
+- Data is **by default encrypted in transit** with SQS and any clients.
+
+- Access to a queue is based on identity policies (**Queue Policy**). 
+  - Queue policies only can allow access from an outside account. This is a resource policy.
 
 ### Kinesis
 
-- Scalable streaming service. It is designed to inject data from
-lots of devices or lots of applications.
-- Many producers send data into a Kinesis Stream.
-- The stream can scale from low to near infinite data rates.
-- Highly available public service by design.
-- Streams store a 24-hour moving window of data.
+- Scalable **streaming** service. 
+  - It is designed to inject data from lots of devices or lots of applications.
+  - you can ingest **real-time data** such as video, audio, application logs, website clickstreams, and IoT telemetry data
+  - ... for machine learning, analytics, and other applications.
+  - enables you to process and analyze data as it arrives and **respond instantly instead of having to wait until all your data is collected** before the processing can begin
+- Producers **send** data into a Kinesis **Stream**.
+  - Stream is the basic entity of Kinesis
+  - Stream can scale from low level of throughput to near infinite data rates.
+- **Highly available**, **public service** by design.
+- **Persistence** - Streams store a **24-hour** moving window of data by default (**similar to how dashboard cameras** store a window of video footage, with the oldest being removed, and the newest appended)
   - Can be increased to 7 days.
   - Data 24 hours + 1s is replaced by new data entering the stream.
 - Kinesis includes the storage costs within it for the amount of data
 that can be ingested during a 24 hour period. However much you ingest during
 24 hours, that's included.
-- Multiple consumers can access data from that moving window.
+- **Multiple consumers can access data from that moving window.**
   - One might look at data points once per hour
-  - Another looks at data 1 per minute.
-- Kinesis stream starts with 1 shard and expands as needed.
+  - Another looks at data once per minute.
+- Kinesis Stream starts with 1 shard and **expands as needed**.
+  - if **performance of Kinesis Stream** has to be improved, **Stream Shards have to be adjusted!!!** (i.e. more stream shards)
   - Each shard can have 1MB/s for ingestion and 2MB/s consumption.
 
-**Kinesis data records (1MB)** are stored across shards and are the blocks
-of data for a stream.
+- **Kinesis Data Record (1MB)** - stored across shards and are the blocks of data for a stream.
 
-**Kinesis Data Firehose** connects to a Kinesis stream. It can move the data
-from a stream onto S3 or another service.
+- **Kinesis Data Firehose** 
+  - **connects** to a Kinesis **Stream**. 
+  - it can **move the data** from a **stream** onto **S3 or another service**
 
 ### SQS vs Kinesis
+
+**Make sure you know following differences between Kinesis and SQS for the exam !!!**
+
+When answering exam questions, we need to ask ourselves:
+- **is the exam question about the INGESTION of data?**
+  - if it's about ingestion, e.g. large throughput or large number of devices, it's likely to be Kinesis
+- **... or is it about worker pools DECOUPLING?**\
+  - most likely SQS, unless strong reason for Kinesis
+- **... or does it mention ASYNCHRONOUS communication?**
+- most likely SQS, unless strong reason for Kinesis
+
 
 Kinesis
 
 - Large throughput or large numbers of devices
-- Huge scale ingestion with multiple consumers
+- **Huge scale** of data ingestion with multiple consumers
+  - each of the consumers might be consuming data at different rates, either real time or periodically, and move backwards and forwards through time
 - Rolling window for multiple consumers
-- Designed for data ingestion, analytics, monitoring, app clicks
+- Designed for **data ingestion, analytics, monitoring, app clicks !!!**
 
 SQS
 
-- 1 thing sending messages to the queue
-- One consumption group from that tier
-- Allow for async communications
-- Once the message is processed, it is deleted
+- 1 production group, 1 consumption group
+  - generally 1 thing/group sending messages to the queue, and 1 thing/group reading from the queue
+- designed for **decoupling** application components, allow for **asynchronous** communications
+  - sender and receiver don't need to be aware of each other and don't care about the functional state of each other
+- once the message is processed, it is deleted - no concept of time window, **no persistence**
 
 ---
 
