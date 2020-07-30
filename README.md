@@ -5004,7 +5004,8 @@ SQS
 
 ### Architecture Basics 
 
-- CloudFront is a global object cache (CDN)
+- CloudFront is a **global** object cache (CDN)
+  - **a global CDN capable of caching both static and dynamic content !!!**
 - **Download caching only**
 - Content is cached in locations close to customers.
 - If the content is not available on the local cache when requested, CloudFront
@@ -5073,48 +5074,150 @@ them and the object is not caching it will need to be fetched first.
 
 ### AWS Certificate Manager (ACM)
 
+
 - HTTP lacks encryption and is insecure
 - HTTPS uses SSL/TLS layer of encryption added to HTTP
-- Data is encrypted in-transit
-- Certificates allow servers to prove their identity
-- Signed by a trusted authority (CA).
+- Data is encrypted **in-transit**
+- Certificates allow servers to prove their **identity**
+- Signed by a **trusted authority (CA).**
 - To be secure, a website generates a certificate, and has a CA sign it. The
-website then uses that certificate to prove its authenticity.
+website then uses that certificate to prove its identity.
 - ACM allows you to create, renew, and deploy certificates.
-- Supported AWS services ONLY (CloudFront and ALB, NOT EC2)
-- If it's not a managed service, ACM doesn't support it.
-- CloudFront must have a trusted and signed certificate. Can't be self signed.
+- Supported AWS services **ONLY** (e.g. CloudFront and ALB, **NOT EC2 !!!**)
+  - we cannot deploy a certificate to EC2 instances
+  - we can deploy a certificate to an Application Load Balancer, which is itself load balancing across these EC2 instances
+- If it's not a managed AWS service, ACM doesn't support it.
+- **CloudFront must have a trusted and signed certificate. Origin certificates must be valid - can't be self signed. !!!**
+  - deploying a certificate to CloudFront **Distribution** means that all the Edge Locations also get that certificate
+  - Edge Locations are accessed using **HTTPS** and the **DNS name** on the certificate
+  - Edge Locations are communicating with Origin (e.g. S3 or ALB) using HTTPS as well
+
+IMPORTANT FOR EXAM !!!:
+- **with ACM, certificates must be created in the region the service which uses them is in !!!**
+- if you want to require HTTPS between **viewers** and **CloudFront**, you must change the AWS Region to **US East (N. Virginia)** in the **AWS Certificate Manager** console before you request or import a certificate.
+  - so for **CloudFront**, we need to create an **ACM certificate** in **us-east-1 !!!**
+- **ACM-integrated services** (services we can use ACM with):
+  - Elastic Load Balancer
+  - CloudFront
+  - Elastic Beanstalk
+  - API Gateway
+  - CloudFormation
+
+
+#### Demo: making S3-bucket-hosted static website publicly accessible using CloudFront
+
+1. Create a S3 bucket and unset `Block public access`
+2. Upload website files to the bucket
+3. Enable `Static website hosting` in Permissions tab
+4. Upload `Bucket policy` to enable public access
+5. Go to CloudFront service and create a Distribution (Web type, the RTMP type will be deprecated soon)
+- set origin (Origin Domain Name): it can be e.g. S3 buckets, ALB or resources outside of AWS which have public IP
+  - here we point it to our S3 bucket with static website
+- pick viewer policy (HTTP and HTTPS; Redirect HTTP to HTTPS; HTTPS Only)
+- we can adjust TTL of cached objects (default is 86,400 seconds)
+- we can set Query String Forwarding and Caching (default is none)
+- **we can set Distribution to be private !!!**
+  - this means that we would need a **signed URL** or **signed cookies** which provide authentication to CloudFront
+- we can pick Price Class to all Edge Locations, or limit it to 2 other options containing the largest continents/countries
+- we can set **Alternate Domain Names (CNAMEs)** for our Distribution
+  - by default, each Distribution is given a generated DNS name (e.g. https://d11111abcef8.cloudfront.net/logo.jpg)
+  - if we want to use Alternate Domain Name (our own domain name), we need to: add the **Route53** configuration and **point it** at the **CloudFront distribution**, then **use AWS Certificate Manager** to **generate an SSL certificate** that **matches that name**
+- we can specify Default Root Object (so there's no need to e.g. specify /index.html)
+- we can enable logging to S3 bucket
+- we can enable IPv6
+6. Once the Distribution is created, we can use its domain name to access our S3-hosted static website
+
 
 ### Origin Access Identity (OAI)
 
-1. Identity can be associated with a CloudFront distribution.
-2. The edge locations gain this identity.
-3. Create or adjust the bucket policy on the S3 origin. Add an explicit allow
-for the OAI. Can remove any other explicit allows on the OAI. This leaves
-the implicit deny.
+Remember that OAI is different than Identity Policies !!!.
+- **Identity Polices** are what we attach to **IAM Users, Groups or Roles**
 
-As long as accesses are coming from the edge locations, it will know they
-are from the OAI and allow them. Any direct attempts will not use the OAI and
+1. **Identity** (OAI) can be associated with a **CloudFront distribution**.
+2. The Edge Locations gain this identity.
+3. Create or adjust the **bucket policy on the S3 bucket (origin)**. 
+- Add an **explicit allow for the OAI** . 
+- We can remove any other **explicit allows** (public access) on the OAI. 
+- This leaves the implicit deny.
+
+At this point, as long as accesses are coming from the Edge Locations, it will know they
+are from the OAI and allow them. Any direct S3 bucket attempts will not use the OAI and
 will only get the implicit deny.
+- **making a CloudFront Distribution private only affects the Edge Locations !!!**
+  - therefore if we want to prevent direct S3 bucket access using the bucket's DNS name, we need to use OAI !!!
 
-Best practice is to create one OAI per CloudFront distribution to manage
-permissions.
+**Best practice is to create one OAI per CloudFront distribution to manage permissions !!!**
 
-### AWS Global Accelerator
+
+### CloudFront Lambda@Edge !!!
+
+- you can run **lightweidght** Lambda functions at **edge locations**
+  - because they run at **edge locations**, they don't have the full Lambda feature set
+- **adjust** data between the **Viewer** and **Origin**
+- currently supports **Node.js** and **Python**
+- runs **only** in the **AWS Public Space** - doesn't run in **VPC** !!!
+- Lambda **Layers** are **not supported**
+  - layer is a ZIP archive that contains libraries, custom runtime, or other dependencies
+  - with normal Lambda (not Lambda@Edge), we can pull in additional code and content in the form of these layers
+- **different limits** vs normal Lambda functions
+
+Architecture:
+- individual components of the wider communication can run a Lambda function
+  - this Lambda function can influence traffic as a part of that connection
+- Request -> Request -> Response -> Response (see below)
+- **Viewer request** -  customer -> Edge Location
+  - function is run **after** CloudFront **receives** a request **from a customer** (1.)
+- **Origin request** - Edge Location -> Origin
+  - function is run **before** CloudFront **forwards** the request **to an origin** (2.)
+- **Origin response** - Origin -> Edge Location
+  - function is run **after** CloudFront receives a response **from an origin** (3.)
+- **Viewer response** - Edge Location -> customer
+  - function is run **before** a response is **forwarded to a customer** (4.)
+
+
+- Viewer-side connections (request and response) have limit of **128 MB, 5 seconds** for a function
+- Origin-side connections (request and response) have limit of **regular Lambda MB constraint, 30 seconds** for a function
+
+**Some of Lambda@Edge use cases**:
+- A/B Testing, using **Viewer request function**
+  - used for comparing two versions of website and choosing one that fits more into requirements
+  - e.g. comparing main functioning website vs its alernatives
+  - Lambda@Edge function can modify the viewer request and change the URL (e.g. percent algorithm, random choice)
+- Migration between S3 Origins, using **Origin request function**
+- Different objects based on device, using **Origin request function**
+- Content by country, using **Origin request function**
+
+### AWS Global Accelerator !!!
 
 - Move the AWS network closer to customers.
-- Designed to optimize the flow of data from users to your AWS infrastructure.
+  - architecturally similar to CloudFront, BUT it **doesn't cache anything** and **doesn't understand HTTP/S**
+  - **on exam, we need to be able to determine when to use CloudFront vs Global Accelerator**
+- Designed to **optimize** the flow of **data from users** to your **AWS infrastructure**.
 - Generally customers who are further away from your infrastructure go through
 more internet based hops and this means a lower quality connection.
-- Normal IP addresses are unicast IP addresses. These refer to one thing.
-- Global Accelerator starts with 2 **anycast** IP address
-  - Special IP address
-  - Anycast IPs allow a single IP to be in multiple locations.
-  - Traffic initially uses public internet and enters Global Accelerator at
+- Normal IP addresses are unicast IP addresses. These refer to one thing: one network device.
+  - usually if we have two devices and only one unicast IP address, bad things may happen
+  - **anycast** IP addresses are designed to allow this
+- **Anycast IPs** allow a **single IP** to be in **multiple locations**
+  - routing moves traffic to **closest location**
+- Global Accelerator starts with 2 **anycast** IP address !!!!
+  - Customer's traffic initially uses **public internet** until it enters Global Accelerator at
   the closest edge location.
-  - Traffic then flows globally across the AWS global backbone network.
-- Global accelerator is a network product, can use TCP/UDP.
+  - **Traffic then flows globally across the AWS global backbone network**
+  - ... it's AWS own dedicated network - much better performance
 
+
+
+Key concepts:
+- CloudFront moves the **content** closer by caching it on the Edge Locations
+- Global Accelerator moves the **actual AWS network** closer
+  - it **doesn't cache anything !!!**
+  - the aim here is to get your customers **onto the global AWS network** as quickly as possible (using **anycast IP addresses**)
+  - once the traffic reaches edge, it's transited over the AWS global network to 1 or more locations where we host our stuff
+- Global Accelerator is a **network product**, can be used for **NON HTTP/S**, so TCP/UDP.
+  - this is **different from CloudFront**
+- if questions mention **caching**, it will most likely be **CloudFront**
+- if questions mention **TCP/UDP**, and the requirement for **global performance optimization**, then it will most likely be **Global Accelerator**
 ---
 
 ## Advanced-VPC
