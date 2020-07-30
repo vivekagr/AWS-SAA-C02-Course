@@ -5002,15 +5002,17 @@ SQS
 
 ## CDN-and-Optimization
 
-### Architecture Basics
+### Architecture Basics 
 
 - CloudFront is a global object cache (CDN)
-- Download caching only
+- **Download caching only**
 - Content is cached in locations close to customers.
 - If the content is not available on the local cache when requested, CloudFront
 will fetch the item and cache it and deliver it locally.
 - This provides lower latency and higher throughput for customers.
 - Can handle static and dynamic content.
+- works with ACM and HTTPS
+  - can provide HTTPS capability for websites statically hosted on S3
 - **Origin** the original location of your content, can be an S3 bucket or LB.
 - **Distribution** the configuration unit of CloudFront.
 - **Edge locations** global infrastructure which hosts a cache of your data.
@@ -5021,9 +5023,40 @@ will fetch the item and cache it and deliver it locally.
   - Larger version of an edge location.
   - Support a number of local edge locations.
   - Designed to hold more data to cache things which are accessed less often.
-  - Provides another layer of caching.
+  - **Provides second layer of caching**.
 
+
+**Scenario**:
+- you upload original content to e.g. S3 bucket
+- you configure Distribution
+- you set origin of this Distribution to point to S3 bucket
+- you deploy that Distribution to the CloudFront Network
+ - push the Distribution configuration to all of the chosen Edge Locations
+- these Edge Locations can be now used by your customers
+
+
+**Architecturally**:
+- on one side there is the bucket with original content
+- on another side there are Edge Locations
+- in between there are **Regional Edge Cache**
+  - they support a number of Edge Locations located in the **same geographic area**
 #### Caching Optimization
+
+
+**How it works !!!**:
+- if someone tries to access the resource, **first the Edge Location is checked**
+  - if the object were to be locally cached at this Edge Location, it would be returned immediately
+  - the request would be returned quickly, great performance
+- if the resource is not present in the Edge Location, **then the Regional Edge Cache** is checked
+  - it acts as a bigger cache for multiple smaller Edge Locations
+  - if any other Edge Locations in the area have previously accessed this object, **it should also be stored at the Regional Edge Cache**
+  - if it's present there, it's pushed back to the Edge Location which originally requested it, where it's also stored
+  - then it's returned to the user that requested it
+- if the resource is not present in the Regional Edge Cache, **it's returned from the origin**
+  - it will be stored in the Regional Edge Cache
+  - Regional Edge Cache pushes the object back to the Edge Location which originally requested it, where it's also stored
+  - then it's returned to the user that requested it
+- for future requests, the resource can be fetched from the Edge Location
 
 Parameters can be passed on the url such as query string parameter.
 An example is `?language=en` and `?language=es`
@@ -5031,12 +5064,12 @@ An example is `?language=en` and `?language=es`
 Caching will cache each string parameter storing two different objects.
 You must use the same string parameters again to retrieve them. If you remove
 them and the object is not caching it will need to be fetched first.
+- this means that when we cache whiskers.jpg, we actually cache whiskers.jpg with all the query string parameters that were used
+- to get cached copy, we need to use exactly the same query strings
 
-If string parameters aren't involved in the caching, you can select no
-to forward them to the origin.
-
-If the application does use query string parameters, you can use all of them for
-caching or just selected ones.
+**Cache Optimization !!!**:
+- If we don't want string parameters to be used for caching, we can select to **not forward them to the origin.**
+- If the application does use query string parameters, we can use **ALL** of them for caching or just **SELECTED** ones.
 
 ### AWS Certificate Manager (ACM)
 
