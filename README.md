@@ -5224,82 +5224,92 @@ Key concepts:
 
 ### VPC Flow Logs
 
-- Capture packet metadata, not packet contents.
-  - Things like source IP
-  - Destination IP
+- Capture **packet METADATA !!!**, not packet contents.
+  - Source IP, Destination IP
+  - Source Port, Desination Port
+  - Protocol (ICMP=1, TCP=6, UDP=17)
+  - Action (ACCEPT, REJECT)
   - Packet size
   - Anything which could be observed from the outside of the packet.
 - Capture data at various different monitoring points.
-  - VPC: all interfaces in that vpc
-  - Subnets: interfaces in that subnet
-  - Interface directly
-- VPC flow logs are not realtime
-- Destination can be S3 or CloudWatch logs
+  - **VPC**: all interfaces in that vpc
+  - **Subnets**: interfaces in that subnet only
+  - **Interface** directly
+- **when service (e.g. RDS) is put in a VP/subnet/interface, it can utilize VPC flow logs**
+- VPC flow logs are **NOT REALTIME !!!**
+- Destination can be **S3** or **CloudWatch logs**
 - Flow log inheritance is downwards starting at the VPC.
-- RDS can use VPC flow logs
 - The packet will always have source, then destination, then response.
+
+- **To and from following services are not recorded:**
+  - 169.254.169.254
+  - 169.254.169.123
+  - DHCP
+  - Amazon DNS Server
+  - Amazon Windows license
+
 
 ### Egress-Only Internet Gateway
 
+- it's an Internet Gateway that **only allows IPv6 connections to be initiated from inside a VPC to outside**
 - IPv4 addresses are private or public
-- NAT allows private IPs to access public networks and receive responses.
-- NAT will not allow externally initiated connections IN.
-- Using IPv6, all IPs are public.
-  - Internet Gateway (IPv6) allows all IPs **in** and **out**
-- Egress-only is **outbound only** for IPv6. It is exactly the same as
-NAT, only outbound only.
+  - private addresses cannot communicate directly with public or public AWS
+  - NAT allows private IPs to access public networks and receive responses.
+  - **NAT will not allow externally initiated connections IN.**
+- All IPv6 addresses in AWS are public.
+- Internet Gateway (IPv6) allows all IPs **in** and **out**
+- Egress-only Internet Gateway is **outbound only** for **IPv6**
 - To configure the Egress-only gateway, you must add default IPv6 route `::/0`
 added to RT with `eigw-id` as target.
 
 ### VPC Endpoints (Gateway)
 
-Allow a private only resource inside a VPC or any resource inside a private
-only VPC access to S3 and DynamoDB.
+- Allow a **private-only resource** inside a VPC or **any resource inside a private-only VPC** access to **S3 and DynamoDB.**
+  - both of these (S3, DynamoDB) are public services
+- Normally when you want to access a public service through a VPC, you need infrastructure. 
+  - You would create an IGW and attach it to the VPC.
+  - Resources inside need to be granted IP address or implement one or more NAT gateways which allow instances with private IP addresses to access these public services.
+- **Gateway Endpoints** are created **per service, per region**
+  - e.g. for S3 in us-east1
+- When you allocate a **Gateway Endpoint** to a subnet(s), a **Prefix List** is added to the route tables for that subnet / these subnets. 
+  - The target is the Gateway Endpoint.
+  - Any traffic destined for S3, goes via the Gateway Endpoint.
+  - Gateway Endpoint is highly available for all AZs in a region by default.
 
-Normally when you want to access a public service through a VPC, you
-need infrastructure. You would create an IGW and attach it to the VPC.
-Resources inside need to be granted IP address or implement one or more
-NAT gateways which allow instances with private IP addresses to access
-these public services.
+- With a Gateway Endpoint you set which subnet will be used with it and it will configure automatically.
+- A Gateway Endpoint is a VPC gateway object.
+- **Endpoint policy** controls what things can be connected to by that endpoint.
+- **Gateway Endpoints can only be used to access services in the same region**.
+  - Can't access cross-region services.
 
-When you allocate a gateway endpoint to a subnet, a prefix list is added
-to the route table. The target is the gateway endpoint.
-Any traffic destined for S3, goes via the gateway endpoint.
-The gateway endpoint is highly available for all AZs in a region by default.
+- S3 buckets can be set to private only by **allowing access ONLY from a Gateway Endpoint (defined in Bucket Policy)**. For anything else, the implicit deny will apply.
+- **Gateway Endpoints are only accessible from inside specific VPC !!!**.
+  - **not accesible outside of the VPC they'are associated with !!!**
+  - **they are logical gateway objects created in a VPC**
+  - **we can access such objects only from that VPC they are created in**
 
-With a gateway endpoint you set which subnet will be used with it and
-it will configure automatically.
-A gateway endpoint is a VPC gateway object.
-Endpoint policy controls what things can be connected to by that endpoint.
-
-Gateway endpoints can only be used to access services in the same region.
-Can't access cross-region services.
-
-S3 buckets can be set to private only by allowing access ONLY from
-a gateway endpoint. For anything else, the implicit deny will apply.
-
-They are only accessible from inside that specific VPC.
+- **Region resilient** by default
 
 ### VPC Endpoints (Interface)
 
-- Provide private access to AWS Public Services.
-  - Anything EXCEPT S3 and DynamoDB
-- These are not HA by default and are added to specific subnets.
-  - For HA, add one endpoint, to one subnet, per AZ used in the VPC
-  - Must add one endpoint for one subnet per AZ
-- Network access controlled via security groups.
-- You can use Endpoint policies to restrict what can be accessed with
+- Provide **private access to AWS Public Services**.
+  - Anything EXCEPT S3 and DynamoDB (these are handled by Gateway Endpoints)
+- Contrary to Gateway Endpoints, **Interface Endpoints are not HA by default and are added to specific subnets**.
+  - For HA, add **one Interface Endpoint** to **each subnet**, **per AZ** used in the VPC
+- **We can have maximum one Interface Endpoint per AZ in VPC !!!**
+- Network access controlled via **Security Groups** (cannot do it in Gateway Endpoints)
+- You can use **Endpoint policies** to restrict **what can be accessed** with
 the endpoint.
-- ONLY TCP and IPv4 at the moment.
-- Behind the scenes, it uses PrivateLink.
+- **ONLY TCP and IPv4** at the moment.
+- Behind the scenes, **it uses PrivateLink**.
 - Endpoint provides a **NEW** service endpoint DNS
   - e.g. `vpce-123-xyz.sns.us-east-1.vpce.amazonaws.com`
-- Regional DNS is one single DNS name that works whatever AZ you're using to
+- **Regional DNS** is one single DNS name that works whatever AZ you're using to
 access the interface endpoint. Good for simplicity and HA.
-- Zonal DNS resolved to that one specific interface in that one specific AZ.
-- Either of those two points of endpoints can be used by applications to
-directly and immediately utilize interface endpoints.
-- PrivateDNS associates R53 private hosted zone with your VPC. This private
+- **Zonal DNS** resolves to that one specific interface in that one specific AZ.
+- Either of those two endpoints can be used by applications to
+directly and immediately utilize Interface Endpoints.
+- **PrivateDNS** associates R53 private hosted zone with your VPC. This private
 hosted zone carries a replacement DNS record for the default service
 endpoint DNS name. It overrides the default service DNS with a new version
 that points at your interface endpoint. Enabled by default.
