@@ -5367,6 +5367,33 @@ use routing and only DNS.
 
 ## Hybrid-and-Migration
 
+### Border Gateway Protocol (BGP)
+
+- utilized by AWS products like **Direct Connect** and **dynamic VPNs**
+- made by **Autonomous Systems (AS)**
+  - routers controllers by one entity - a network in BGP
+- **Autonomous System Number (ASN)**
+  - are unique
+  - allocated by IANA (0-65535)
+  - 64512-65534 are private - can be utilized by private peering arragemenets without being officially allocated
+- BGP operates over **TCP port 179** - it's reliable
+- **Not automatic** - peering is **manually configured**
+- BGP is **path-vector protocol**
+  - it exchanges the **best path** to a **destionation** between **peers**
+  - the path is called **ASPATH**
+- **account link speed or condition is not taken into account**
+  - instead, ASPATH is considered
+  - this means that e.g. when A - B and B - C is connected with 1Gbps fibre, and A - C is connected with 5Mbps satellite, A - C would still default to the A - C because it's the shortest ASPATH, even though A - B - C would provide better performance
+  - **BUT...** we can use **AS Path Prepending** to artifically make the satellite path look longer, making the fibre path preferred
+    - this works by artifically prepending ASPATHs, e.g. 202,i becomes 202,202,202,i
+- two types of BGP:
+  - **iBGP** - internal BGP, focuses on routing **within** an AS
+  - **eBGP** - external BGP, focuses on routing **between** AS's
+    - eBGP tends to be used most often with AWS
+- 
+
+
+
 ### AWS Site-to-Site VPN
 
 - A logical connection between a VPC and on-premise network encrypted in transit
