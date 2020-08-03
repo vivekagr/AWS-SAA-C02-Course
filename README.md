@@ -5332,33 +5332,37 @@ use routing and only DNS.
 
 ### VPC Peering
 
-Direct encrypted network link between two and only two VPCs.
-Peering connection can be in the same or cross region and in the same or
-across accounts.
+- **Direct**, **encrypted** network link between **two and only two VPCs**.
+  - Peering connection can be in the same or cross region and in the same or across accounts.
+- When you create a **VPC peer**, you can enable an option so that **public hostnames** of services in the peered VPC resolve to the **private internal IPs**.
+  - You can use the same DNS names if its in peered VPCs or not. 
+  - If you attempt to resolve the public DNS hostname of an EC2 instance, it will resolve to the private IP address of the EC2 instance.
 
-When you create a VPC peer, you can enable an option so that public hostnames
-of services in the peered VPC resolve to the private internal IPs. You
-can use the same DNS names if its in peered VPCs or not. If you attempt
-to resolve the public DNS hostname of an EC2 instance, it will resolve
-to the private IP address of the EC2 instance.
+- Same region **Security Groups** can reference **peer Security Groups**
+- VPCs **in the same region can reference each other by using security group ID**.
+- You can do the same efficient referencing and nesting of security groups that you can do if you're inside the same VPC. 
+  - This is a feature that only works with **VPC peers inside the same region**.
 
-VPCs in the same region can reference each other by using security group id.
-You can do the same efficient referencing and nesting of security groups that
-you can do if you're inside the same VPC. This is a feature that only works
-with VPC peers inside the same region.
+- In **different regions**, you can utilize security groups, but **you'll need to reference IP addresses or IP ranges**.
+- If VPC peers are in the same region, then you can do the logical referencing of an entire security group.
 
-In different regions, you can utilize security groups, but you'll need to
-reference IP addresses or IP ranges. If VPC peers are in the same region,
-then you can do the logical referencing of an entire security group.
+- VPC peering connects **ONLY TWO VPCs**
 
-VPC peering connects **ONLY TWO**
+- VPC Peering does not support **transitive peering**.
+  - it means that if we have A - B - C, there's no connection between A and C.
+  - If you want to connect 3 VPCs, you need 3 connections (A - B - C - A).
 
-VPC Peering does not support **transitive peering**.
-If you want to connect 3 VPCs, you need 3 connections. You can't route
-through interconnected VPCs.
+- **Routing** Configuration is needed, **SGs and NACLs** can filter
+- VPC Peering Connections **CANNOT be created with overlapping VPC CIDRs !!!!!!!!**.
 
-VPC Peering Connections CANNOT be created with overlapping VPC CIDRs.
+- Communication is **encrypted** and trasits over the **AWS Global Network** when using cross-region peering connections
 
+**How does it work?**
+- we create 3 VPCs
+- we create a VPC Peering between VPC-A and VPC-B, VPC-B and VPC-C
+- route tables at **both sides** of the peering connection are needed
+  - traffic directed for the remote CIDR: e.g. VPC-A has 10.16.0.0/16, and we route traffic to 10.17.0.0/16, which is VPC-B's, to **peer gateway object**
+  - for this reason, the **VPC Peering cannot be created** where there's **overlap in the VPC CIDRs**
 ---
 
 ## Hybrid-and-Migration
