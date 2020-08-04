@@ -5397,84 +5397,133 @@ use routing and only DNS.
 ### AWS Site-to-Site VPN
 
 - A logical connection between a VPC and on-premise network encrypted in transit
-using IPSec, running over the public internet.
-- This can be fully Highly Available if you design it correctly
-- Quick to provision, less than an hour.
-- VPNs connect VPCs and private on-prem networks.
-- Virtual Private Gateway (VGW) is the target on one or more route tables
-- Customer Gateway (CGW)
+using IPSec, running over the **public internet\***
+- Full HA - if we design and implement it correctly
+  - router on customer premises is a single point of failure
+  - for full HA, we need more than one customer routers
+- Quick to provision, **less than an hour**.
+  - in contrast to physical connections like **DirectConnect which take much longer to provision**
+- VPNs connect **VPCs** and **private on-prem networks**.
+- **Virtual Private Gateway (VGW)** is the target on one or more route tables
+  - it can be attached to only one VPC
+- **Customer Gateway (CGW)**
   - logical piece of configuration on AWS
   - thing that configuration represents
-- VPN connection itself stores the config and links to one VGW and one CGW
-- Speed cap on VPN with two tunnels of 1.25 Gbps (gigabits per second).
+- **VPN connection** itself **stores the config** and **links to one VGW and one CGW**
+
+
+**Static vs Dynamic VPN (BGP)**
+- Static VPN:
+  - VPC's routes for remote side added to **route tables** as **static routes**
+  - VGW to on-premises networks for remote side **statically** configured on the **VPN connection**
+  - **NO LOAD BALANCING AND MULTI CONNECTION FAILOVER**
+- Dynamic VPN:
+  - we use BGP (Border Gateway Protocol)
+    - it lets **routers exchange networking information**
+    - it's configured on **customer and AWS side using Autonomous System Number (ASN)**
+  - can communicate the state of links, adjust routing on the fly
+    - **MULTIPLE VPN CONNECTIONS PROVIDE HA AND TRAFFIC DISTRIBUTION**
+  - VPC's routes for remote side added to **route tables** can be **static**, but we can also make them **dynamic**
+    - **Route propagation** means routes are added to the route table automatically (routes taken from VGW)
+
+
+**VPN Considerations**
+- **Speed cap on VPN with two tunnels of 1.25 Gbps !!!**
+  - if we want more than 1.25 Gbps, we can't use VPNs
   - AWS limit, will need to check speed supported by customer router.
   - Will be processing overhead on encrypting and decrypting data.
   At high speeds, this overhead can be significant.
-- Latency is inconsistent because it uses the public internet.
+- **Latency is inconsistent** because it uses the **public internet**
+  - something more reliable might be DirectConnect
 - Cost
   - AWS charges hourly
   - GB transfer out cost
   - on-premises internet connection costs
-- VPN setup of hours or less
+- VPN setup - hours of work
+  - still faster to setup than almost anything else
 - Great as a backup especially for Direct Connect (DX)
+
 
 ### AWS Direct Connect (DX)
 
-- Port operating at a certain speed which belongs to a certain AWS account.
+- in many ways similar to VPN, but it's an actual **physical connection**
+- DX port is a **physical allocation** inside a data center
+- DX Port operating at a certain speed which belongs to a certain AWS account.
 - Allocated at a DX location which is a major data center.
-- Two speeds
-  - 1 Gpbs: 1000-Base-LX
-  - 10 Gbps: 10GBASE-LR
-- This is a cross connect to your customer router (requires VLANS/BGP)
-- You can connect to a partner router if extending to your location.
-  - The port needs to be arranged to connect somewhere else and connect to
-  your hardware.
-- This is a single fiber optic cable from the DX port to your network.
-- VIFs are multiple virtual interfaces (VIFs) over one DX
-  - Private VIF (VPC)
-    - Represents one VPC
-    - Can have as many Private VIFs as you want.
+- Two speeds of Network Point into AWS
+  - **1 Gpbs**: 1000-Base-LX
+  - **10 Gbps**: 10GBASE-LR
+- This is a cross connect to your **Customer Router** (requires VLANS/BGP)
+- ... or you can connect to a **Partner Router** if **extending** to your location.
+  - this may take some additional time
+- Think of this as a **single fiber optic cable** from the **AWS-managed DX port** to your **network !!!**.
+- VIFS (Virtual Interfaces) are **virtual connections** that run over the top of **physical DX connection**
+  - one physical connection can have multiple VIFS running over the top of it
+  - each of these VIFS is a **VLAN and BGP connection** between your **router** and the **AWS DX router**
+- two types of VIFS:
+  - **Private VIF** (VPC)
+    - associated with a Virtual Private Gateway (VGW) and **connect to a single VPC**
+    - provide private network connectivity betwen a VPC and your on-premises network
+    - Can have as many Private VIFS as you want.
   - **Public VIF** (Public Zone Services)
-    - Only public services, not public internet
+    - Only **public AWS services**, not public internet
 
-Has one physical cable with no high availability and no encryption.
-DX Port Provisioning is likely quick, the cross-connect takes longer.
-Can take weeks or month for physical cable to be installed.
-Generally use a VPN first then bring a DX in and leave VPN as backup.
 
-- Up to 40 Gbps with aggregation, 4 x 10 Gbps ports.
-- It does not use public internet and provides consistently low latency.
-  - Does not consume any data.
+**DX considerations:**
+- takes **MUCH** longer to provision vs **VPN**
+  - **DX port** provision **is quick**
+  - it's the **cross-connect** that **takes longer**
+  - extension to premises can take **weeks/months**
+- Use **VPN first**, then **replace with DX** (or leave VPN as backup)
+- **Faster: 40 Gbps with Aggregation !!!**
+- **Low CONSISTENT latency, doesn't use business bandwidth !!!**
+- EXAM: **NO BUILT-IN ENCRYPTION**
+  - completely unecrypted connection !!!
+  - things running on top of it might be encrypted
+- ... BUT !!!:
+  - public VIFS allow connection to public AWS services
+  - inside the VPC we already have the **Virtual Private Gateway (VGW)**
+  - ... because this is used for any **private VIFS** running over the Direct Connect
+  - when we create a **Virtual Private Gateway** it actually creates **endpoints** inside the AWS public zone with public IP addresses
+  - so we can create a **VPN** but as transit network use the **public VIF** running over **Direct Connect** (fast physical connection), **instead of using public internet as in regular VPN**
+  - in this case it would leverage the **already created endpoints** and run **IPSEC (encrypted) VPN** over a **public VIF**
+  - this would all the benefits of DX: **speed, low latency** + benefits of IPSEC VPN: **encryption**
 
-DX provides NO ENCRYPTION and needs to be managed on a per application basis.
-There is a common way around this limitation.
-The Public VIF allows connections to AWS public services. Inside the VPC we
-already have a virtual private gateway, because this is used for any private
-VIFs running over the Direct Connect. Creating a virtual private gateway
-creates end points that are located inside the AWS public zone with public
-IP addresses. These end points have already been created and they already
-exist. We can create a VPN and instead of using the public internet as the
-transit network, you can use the public VIF running over Direct Connect.
-
-You run an IPSEC VPN over the public VIF, over the Direct Connect connection,
-you get all of the benefits of Direct Connect such as high speeds, and all
-the benefits of IPSEC encryption.
 
 ### AWS Transit Gateway (TGW)
 
-- Network transit hub to connect VPCs to on premises networks
-- Significantly reduces network complexity.
-  - Supports transitive routing. No need to create a mesh topology.
-- Single network gateway object which makes it HA and scalable.
-- Create attachments to allow Transit Gateway to connect to other network objects.
-  - VPC attachments
-  - Site to Site VPN attachments
-  - Direct Connect attachments
-- VPC attachments are configured with a subnet in each AZ where service
-is required.
-- Can be used to create global networks.
-  - You can use these for cross-region peering attachments.
-- Can share between accounts using AWS RAM
+- Network Transit Hub to **connect VPCs to on premises networks**
+  - it uses site-to-site **VPNs** and **Direct Connect**
+- Significantly **reduces** network **complexity**.
+- single Network Gateway Object - so it's HA and scalable
+- Create **attachments** to allow Transit Gateway to connect to other network objects.
+  - **VPC** attachments
+  - **Site to Site VPN** attachments
+  - **Direct Connect Gateway** attachments
+- Supports **transitive routing**. 
+  - **No need to create a mesh topology**.
+  - **Without it**, for mesh topology:
+    - we'd need to create VPN connections for all VPCs to the Customer Gateway
+    - for full HA we'd need to have at least two Customer Gateways, which means at least 2x VPN connections
+  - **with** Transit Gateway:
+    - we'd have a single Transit Gateway using a Site-to-Site VPN attachment
+    - which means it becomes the AWS side termination point for the VPN
+    - so instead of having connections from all the VPCs, we'd have connections from this one Transit Gateway to 1+ Customer Gateways
+    - we'd have **VPC attachments** configured with a **subnet in each AZ** where service is required
+    - then, **one single Transit Gateway would act as a HA inter-VPC router**
+    - **since it's transitive, we wouldn't need peering - all of the VPCs can talk to each other through the Transit Gateway !!!**
+- Can be used to connect to **Direct Connect Gateway**
+- Transit Gateway comes with a default route table
+  - but we can configure **multiple route tables** allowing complex routing architectures
+
+
+**Transit Gateway considerations:**
+- supports **transitive routing** - no need for mesh topology
+- can be used to create **global networks**
+- can share between accounts using AWS RAM (Resource Access Manager)
+- can be used to **peer with different regions** 
+  - in the same or cross-account
+- **less complexity in comparison to without TGW**
 
 ### Storage Gateway
 
