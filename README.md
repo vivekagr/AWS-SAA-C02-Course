@@ -5509,7 +5509,7 @@ using IPSec, running over the **public internet\***
     - we'd have a single Transit Gateway using a Site-to-Site VPN attachment
     - which means it becomes the AWS side termination point for the VPN
     - so instead of having connections from all the VPCs, we'd have connections from this one Transit Gateway to 1+ Customer Gateways
-    - we'd have **VPC attachments** configured with a **subnet in each AZ** where service is required
+    - we'd have **VPC attachments (one for each VPC)** configured with a **subnet in each AZ** where service is required
     - then, **one single Transit Gateway would act as a HA inter-VPC router**
     - **since it's transitive, we wouldn't need peering - all of the VPCs can talk to each other through the Transit Gateway !!!**
 - Can be used to connect to **Direct Connect Gateway**
@@ -5527,60 +5527,89 @@ using IPSec, running over the **public internet\***
 
 ### Storage Gateway
 
-- Hybrid Storage Virtual Application (On-premise)
-  - Can be run inside AWS as part of certain disaster recovery scenarios
-  - Allows for migration of existing infrastructure into AWS slowly.
-- Tape Gateway (VTL) Mode
-  - Virtual Tapes are stored on S3
-- File Mode (SMB and NFS)
-  - File Storage Backed by S3 Objects
-- Volume Mode (Gateway Stored)
-  - Block Storage backed by S3 and EBS
-  - Great for disaster recovery
-  - Data is kept locally
-  - Awesome for migrations
-- Volume Mode (Cache Mode)
-  - Data as added to gateway is not stored locally.
-  - Backup to EBS Snapshots
-  - Primarily stored on AWS
-  - Great for limited local storage capacity.
+- Hybrid Storage Virtual Application (**On-premises**)
+  - **extension, migration, backups**
+- **Extension** of **File** and **Volume** Storage into AWS
+  - technique called **Data Center Extension**
+- **Volume** storage **backups into** AWS
+- **Tape** backups **into** AWS
+- **Migration** of existing infrastracture to AWS
 
-### Snowball / Edge / Snowmobile
 
-Designed to move large amounts of data IN and OUT of AWS.
-Physical storage the size of a suitcase or truck.
-Ordered from AWS, use, then return.
+Modes:
+- **Tape Gateway Mode** (**VTL** - Virtual Tape Library) Mode
+  - Virtual Tapes are stored on S3 and Glacier
+- **File Gateway Mode** (SMB and NFS - common file sharing protocols)
+  - **File Storage** backed by **S3** Objects
+- **Volume Gateway Mode** (Gateway **Cache** or Gateway **Stored**) - iSCSI
+  - **Block Storage** backed by **EBS Snapshots (Stored) or EBS Snapshots + S3 (Cache)**
+  - two types:
+    - Gateway **Stored**
+      - **DATA IS HELD LOCALLY ON THE STORAGE GATEWAY !!!**
+      - Great for **disaster recovery**
+      - not for extensions
+    - Gateway **Cache**
+      - **DATA IS STORED IN AWS PRIMARLY, ONLY FREQUENTLY ACCESSED DATA IS DOWNLOADED INTO THE APPLIANCE !!!**
+      - designed for extensions into AWS when our capacity is limited 
+      - Backup to S3-backed volumes and EBS Snapshots
+      - Great for **limited local storage capacity**.
+        - and we want to extend this capacity in our data center using AWS and volume storage
+        - similar to File Gateway Mode, but FGM uses file storage, not block storage like in Volume Gateway Mode
+
+
+If:
+- we need to replace a **tape backup system**: pick the Tape Gateway Mode
+- we need to store **files** and have those transfer through to **S3**: pick the File Gateway Mode
+- we need **block storage (volumes)**, decide between Volume Gateway: **Stored** or **Cache**
+  - Stored: keep the storage locally, but asynchronously backup to AWS
+  - Cache: extend into AWS while minimizing local footprint
+
+### Snowball / Snowball Edge / Snowmobile
+
+- Designed to **move large amounts of data IN and OUT of AWS**.
+- Physical storage the size of a suitcase or truck.
+- Ordered from AWS, use, then return.
 
 #### Snowball
 
-- Any data on Snowball uses KMS at rest encryption.
-- 1 Gbps or 10 Gbps connection
-- 50TB or 80TB Capacity.
-  - 10TB to 10PB of data is economical range.
-  - Good for multiple locations
-- No compute
+- a physical process
+  - ordered from AWS
+  - log a job
+  - device delivered (**not instant**)
+- any data on Snowball is stored with **KMS At Rest encryption**
+- **1 Gbps** or **10 Gbps** connection
+- **50TB** or **80TB** Capacity.
+  - but we can order **multiple devices** and use them for more than 80 TB
+  - **multiple devices** to **multiple premises !!!** (e.g. order 10 snowballs, one for each of our 10 business premises)
+- **10TB** to **10PB** of data is economical range (**multiple devices**) !!!!
+- Good for multiple locations
+- **Only storage, No compute !!!**
+- older generation than Snowball Edge, doesn't include compute
 
 #### Snowball Edge
 
-- Includes both storage and compute
-- Larger capacity vs snowball.
-- Faster networking over Snowball
-  - 10 Gbps or up to 100 Gbps
-- Three types of Snowball Edge
-  - Storage optimized
+- Includes **both storage and compute**
+  - like Snowball, but it comes with **compute** capability
+- **Larger capacity** vs Snowball.
+- **Faster networking** vs Snowball
+  - 10 Gbps, 10/25 Gbps, 45/50/100 Gbps
+- **Three types** of Snowball Edge
+  - **Storage** optimized
     - 80TB storage, 24 vCPU, 32 GiB RAM
-    - (with EC2) includes 1TB SSD
-  - Compute optimized
-    - 100TB storage, 7.68 GB NVME (fast PCI bus storage),52 vCPU, 208 GiB RAM
-  - Compute with GPU
-    - Same as compute, but with GPU
+    - **but with EC2, includes 1TB SSD**
+  - **Compute** optimized
+    - 100TB storage, 7.68 GB NVME (fast PCI bus storage), 52 vCPU, 208 GiB RAM
+  - **Compute** with **GPU**
+    - Same as Compute optimized, but **with GPU**
+- newer generation than Snowball, does include compute
 
 #### Snowmobile
 
-Portable data center within a shipping container on a truck.
-This is a special order and is not available in high volume.
-Ideal for single location where 10 PB+ is required.
-Max is 100 PB per snowmobile.
+- **Portable data center** within a **shipping container on a truck**
+- This is a special order and is not available in high volume, and not available everywhere
+- ideal for **single location** where **huge amounts of data ingestion** (**10 PB+**) is required.
+- **max is 100 PB per Snowmobile !!!**
+- NOT ECONOMICAL FOR **MULTI-SITE (UNLESS HUUGE)** OR **SMALLER THAN 10 PB** !!!
 
 ### AWS Directory Service
 
