@@ -5485,7 +5485,7 @@ using IPSec, running over the **public internet\***
   - inside the VPC we already have the **Virtual Private Gateway (VGW)**
   - ... because this is used for any **private VIFS** running over the Direct Connect
   - when we create a **Virtual Private Gateway** it actually creates **endpoints** inside the AWS public zone with public IP addresses
-  - so we can create a **VPN** but as transit network use the **public VIF** running over **Direct Connect** (fast physical connection), **instead of using public internet as in regular VPN**
+  - so we can create a **VPN** but as transit network use the **public VIF !!!** running over **Direct Connect** (fast physical connection), **instead of using public internet as in regular VPN**
   - in this case it would leverage the **already created endpoints** and run **IPSEC (encrypted) VPN** over a **public VIF**
   - this would all the benefits of DX: **speed, low latency** + benefits of IPSEC VPN: **encryption**
 
@@ -5539,7 +5539,7 @@ using IPSec, running over the **public internet\***
 Modes:
 - **Tape Gateway Mode** (**VTL** - Virtual Tape Library) Mode
   - Virtual Tapes are stored on S3 and Glacier
-- **File Gateway Mode** (SMB and NFS - common file sharing protocols)
+- **File Gateway Mode** (**SMB !!!** and **NFS !!!**- common file sharing protocols)
   - **File Storage** backed by **S3** Objects
 - **Volume Gateway Mode** (Gateway **Cache** or Gateway **Stored**) - iSCSI
   - **Block Storage** backed by **EBS Snapshots (Stored) or EBS Snapshots + S3 (Cache)**
@@ -5549,6 +5549,7 @@ Modes:
       - Great for **disaster recovery**
       - not for extensions
     - Gateway **Cache**
+      - good for data centre extension into AWS
       - **DATA IS STORED IN AWS PRIMARLY, ONLY FREQUENTLY ACCESSED DATA IS DOWNLOADED INTO THE APPLIANCE !!!**
       - designed for extensions into AWS when our capacity is limited 
       - Backup to S3-backed volumes and EBS Snapshots
@@ -5572,7 +5573,7 @@ If:
 
 #### Snowball
 
-- a physical process
+- a physical process, **NOT ELECTRONIC METHOD**
   - ordered from AWS
   - log a job
   - device delivered (**not instant**)
@@ -5613,57 +5614,110 @@ If:
 
 ### AWS Directory Service
 
-Directories stores objects, users, groups, computers, servers, file shares with
-a structure called a domain / tree. Multiple trees can be grouped into a forest.
+- provides a managed directory, a store of **objects**:
+  - users
+  - groups
+  - computers
+  - servers
+  - file shares 
+- ... with a **structure** called a domain / tree. 
+  - multiple trees can be grouped into a forest.
+- commonly used in **Windows environments**
+- devices can join a directory
+  - so laptops, desktops, and servers can all have a **centralized management and authentication**
+  - you can sign into multiple devices with the same username and password.
 
-Devices can join a directory so laptops, desktops, and servers can all have
-a centralized management and authentication. You can sign into multiple
-devices with the same username and password.
+- one common directory is **Active Directory** by Microsoft
+  - its full name is **Microsoft Active Directory Domain Services** (AD DS)
+- AD DS is mort popular, but there are **open-source** alternatives (e.g. **SAMBDA**)
 
-One common directory is **Active Directory** by Microsoft and its full name is
-**Microsoft Active Directory Domain Services** or AD DS.
-
-- AWS managed implementation.
-- Runs within a VPC as a private service.
-- Provides HA by deploying into multiple AZs.
-- Certain services in AWS need a directory, Amazon Workspaces.
-- To join EC2 instances to a domain you need a directory.
-- Can be isolated inside AWS only or integrated with existing on-prem system.
-- Connect Mode allows you to proxy back to on-premises.
+**AWS Directory Service**:
+- AWS-managed implementation of directory
+  - equivalent of Active Directory, like RDS is of databases
+- **no admin overhead of running our Directory service !!!**
+- runs within a **VPC** as a **private service**
+- provides **HA** by deploying into **multiple AZs**
+- certain services in AWS **require** a directory, e.g. **Amazon Workspaces** (equivalent of Citrix)
+- to join EC2 instances to a domain you need a directory.
+- can be:
+  - **isolated** inside AWS only, or ...
+  - **integrated** with existing **on-prem directory**, or ...
+  - act as a **proxy** back to on-premises
 
 #### Directory Modes
 
 - **Simple AD**: should be default. Designed for simple requirements.
-- **Microsoft AD**: is anything with Windows or if it needs a trust relationship
-with on-prem. This is not an emulation or adjusted by AWS.
-- **AD Connector**: Use AWS services without storing any directory info in the
-cloud, it proxies to your on-prem directory.
+  - open source directory
+  - based on **Samba 4**
+  - if open-source / Samba / Samba 4 is mentioned, most likely it'll be **Simple AD**
+  - up to 500 users (small) or 5,000 users (large)
+  - integrates with AWS services - EC2, Workspaces
+- **Microsoft AD**: 
+  - Windows
+  - trust relationship with on-prem over private networking (either Direct Connect or VPN)
+  - **primary** running location is in **AWS**
+    - **resilient** if the VPN fails - services in AWS will still be able to access the directory running in Directory Service
+- **AD (Active Directory) Connector**: 
+  - allows AWS services which NEED a directory to use an existing on-premises directory
+  - it **proxies to your on-premises directory**
+  - if private connectivity fails, the AD proxy won't function
+    - services at AWS side will be interrupted
+
+When to choose what:
+- **Simple AD**
+  - default
+  - simple requirements
+  - a directory in AWS
+- **Microsoft AD**
+  - apps in AWS which need Microsoft AD DS
+  - need to **trust** AD DS
+- **AD Connector**
+  - AWS services which need a directory **without storing any directory info in the cloud**
+  - **proxy** to our on-premises Directory
 
 ### AWS DataSync
 
-- Data transfer service TO and FROM AWS.
-- This is used for migrations or for large amounts of data processing transfers.
-- Designed to work at huge scales. Each agent can handle 10 Gbps and each job
-can handle 50 million files.
-- Transfers metadata and timestamps
-- Each agent is about 100 TB per day.
-- Can use bandwidth limiters to avoid customer impact
-- Supports incremental and scheduled transfer options
-- Compression and encryption in transit is also supported
-- Has built in data validation and automatic recovery from transit errors.
-- AWS service integration with S3, EFS, FSx for Windows servers.
-- Pay as you use product.
+- data transfer service **TO** and **FROM** AWS
+  - migrations
+  - data processing transfers
+  - archival / cost effective storage
+  - Disaster Recovery / Business Continuity planning
+- designed to work at **huge scales**
+  - each **Agent** can handle 10 Gbps
+  - each **Job** can handle 50 million files
+- very few scenarios will require that level of capacity / performance
+- integrates with **EFS, FSx, S3**
+- keeps **METADATA** (e.g. permissions, timestamps)
+- built-in **DATA VALIDATION** enabled by default
+  - data after arrival matches the original data
+- **SCALABLE** - 10 Gbps per Agent (100~ TB per day), can add additional Agents
+- **BANDWIDTH LIMITERS** to avoid customer impact of transfering the data
+- **INCREMENTAL** and **SCHEDULED** transfer options
+- **COMPERSSION** and **ENCRYPTION** in transit is also supported
+- **AUTOMATIC RECOVERY** from transit errors
+- **AWS SERVICE INTEGRATION** with S3, EFS, FSx for Windows servers
+  - for some services, it supports service-to-service transfer
+  - so moving data from EFS to EFS inside AWS, even across regions
+- pay-as-you-use product - **cost per GB of data moved**
+
+
+- DataSync **Agent has to be installed on on-premises**
+  - it runs on a virtualisation platforms, e.g. VMWare
+  - **Agent communicates over NFS or SMB with on-premises storage**
+  - transfers the data to AWS DataSync **Endpoint** which runs within AWS (communication is encrypted in transit - TLS)
+- once data arrives at **Endpoint**, it can store it in a number of different types of locations
+
 
 #### AWS DataSync Components
 
-- Task
-  - job within datasync
-  - defines what is being synced how quickly
-  - defines two locations involved in the job
-- Agent
-  - software to read and write to on prem such as NFS or SMB
+- **Task**
+  - job within DataSync
+  - defines **what** is being synced and **how quickly**
+  - defines **two locations** involved in the job (**FROM** where and **TO** where)
+- **Agent**
+  - software to read and write to on-prem using **NFS or SMB**
   - used to pull data off that store and move into AWS or vice versa
-- Location
+- **Location**
   - every task has two locations `FROM` and `TO`
   - example locations:
     - network file systems (NFS), common in Linux or Unix
@@ -5672,27 +5726,76 @@ can handle 50 million files.
 
 ### FSx for Windows File Server
 
-- Fully managed native windows file servers/shares
-- Designed for integration with Windows environments.
+- Fully managed **Windows-native file system, accessed over SMB !!!**
+  - architected similarly to RDS, but instead of databases, we get file shares
+- Designed for **integration** with **Windows environments**
   - native Windows file system, not emulated server
-- Integrates with Directory Service or Self-Managed AD
-- Can be used in **Single** or **Multi-AZ** within a VPC.
-  - This controls the network interfaces that are available.
-  - Single mode use replication in the AZ to ensure resiliency.
+- Integrates with **Directory Service** or **Self-Managed AD (on-premises)**
+- **Resilient** and **HA**
+- **Single** or **Multi-AZ** within a VPC.
+  - This controls the network interfaces (ENI) that are available.
+  - Single mode use **replication** in the AZ to ensure **resiliency**.
+  - Multi-AZ provides fully HA solution
 - Can perform full range of different backups
-  - Client side and AWS side
-  - Can perform automatic and on-demand backups.
-- File systems can be access using VPC, Peering, VPN, Direct Connect. Native
-windows filesystem or Directory Services.
+  - **Client side** and **AWS side**
+  - Can perform **scheduled** and **on-demand** backups
+- Accessible using **VPC, Peering, VPN, Direct Connect**
+- KMS at-rest encryption and enforced enryption in-transit
 
-#### Words to look for
 
-- VSS: User Driven Restores
-- Native File System (NFS) accessible over SMB
-- Windows permissions model
-- Product supports DFS, scale out file share.
-- Managed service, no file server admin
-- Integrates with DS and your own directory.
+#### FSx: words to look for in exam !!!!
+
+- **VSS**: file- and folder-level restores
+  - unique to FSx
+  - users can view different versions of file, restore from a user-driven perspective without having to engage admin
+- Native File System (**NFS**) accessible over **SMB !!!**
+  - if SMB is mentioned, it most likely will be FSx
+  - **NFS** is **accessible only** from **EC2 instances** or **Linux on-premises** services
+- **Windows permissions model**
+- supports **Distributed File System (DFS) !!!**: scale-out file share structure
+- **already managed** service, **no admin overhead**
+- integrates with **DS** and **your own** on-premises directory service (e.g. AD)
+
+
+
+### FSx for Lustre
+
+- Lustre: file system designed for various **high performance computing** workloads (a portmanteau word derived from Linux and cluster)
+- managed Lustre - designed for **HPC (High Performance Computing) - Linux** Clients (**POSIX-style permissions for file systems !!!**)
+- Machine Learning, Big Data, Financial Modelling
+- **100's GB/s througphut**
+- **sub millisecond latency**
+- deployment types:
+  - **Scratch**
+    - highly optimised for **short term storage**
+    - **no HA, no replication**
+    - fast
+    - base **200 MB/s per TiB of storage**
+  - **Persistent**
+    - **longer term storage**
+    - HA **but in one AZ only !!! - self healing**
+    - **50 MB/s, 100 MB/s, 200 MB/s per TiB storage**
+- for both Scratch and Persistent, we can **burst** up to **1300 MB/s per TiB of storage**
+  - based on **Credit System**
+- for both Scratch and Persistent, we can **backup to S3** (manual or automatic 0-35 day retention)
+- accessible over **VPN** or **Direct Connect**
+- S3 Bucket can be attached as a repository
+  - when the S3 Bucket-hosted data is accessed in the FSx file system, it's lazy loaded from S3
+- data can be exported back to S3 at any point using **hsm_archive** command
+- Lustre **splits data** up **when it's storing it** to disks:
+  - metadata (filenames, timestamps, permissions) stored on **Metadata Targets (MST)** 
+    - Lustre filesystem has **one MST**
+  - objects stored over **multiple Object Storage Targets (OSTs)**
+    - each OST is **1.17 TiB**
+- baseline **performance based on size**
+- size: min **1.2 TiB**, then increments of **2.4 TiB**
+
+
+**On exam !!!**, pick FSx Lustre when following keywords are mentioned:
+- Lustre
+- really high-end **performance** requirements
+- POSIX
+- Machine Learning, SageMaker, Big Data, etc.
 
 ---
 
