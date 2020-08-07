@@ -5803,115 +5803,133 @@ When to choose what:
 
 ### AWS Secrets Manager
 
-- Share functionality with parameter store. Sometimes both are appropriate.
-- Designed specifically for secrets, passwords, API keys.
-- Usable via Console, CLI, API, or SDK (integration)
-- Supports the automatic rotation of secrets using Lambda.
-- Directly integrates with RDS and a limited set of AWS products. If lambda
-is invoked and changes a secret, the password can automatically change in RDS.
-- Secrets are encrypted at rest.
-- Integrates with IAM, can use IAM permissions to control access to secrets.
+- this is **NOT SSM (Systems Manager) Parameter Store**
+  - just like Parameter Store, it lets us store secrets
+  - but it focuses on **storage and ROTATION of secrets**
+- **share functionality** with **Parameter Store**. 
+  - sometimes both are appropriate.
+- designed specifically for **secrets**: **passwords, API keys**
+- usable via Console, CLI, API, or SDK (integration)
+- supports the **automatic rotation** of secrets using **Lambda**
+- directly **INTEGRATES** with some AWS products (e.g. **RDS !!! watch out for RDS on exam**) 
+- if Lambda is invoked and **changes (rotates)** a secret, the **password can automatically change** in RDS.
+- secrets are **encrypted at rest**.
+- integrates with **IAM**, can use **IAM permissions** to **control access** to secrets.
 
 #### Secrets Manager Example
 
-1. The Secrets Manager SDK retrieves database credentials.
-2. SDK uses IAM credentials to retrieve the secrets.
+1. The Secrets Manager **SDK** retrieves database credentials.
+2. SDK uses **IAM credentials** to retrieve the secrets.
 3. Application uses the secrets to access the database.
-4. Periodically, a lambda function is invoked to rotate the secrets.
-5. The Lambda uses an execution role to get permissions.
+4. Periodically, a lambda function is invoked to **rotate** the secrets.
+5. The Lambda uses an **execution role** to get permissions.
 
 Secrets are secured using KMS so you never risk any leakage via physical access
 to the AWS hardware and KMS ensures role separation.
 
 ### AWS Shield and WAF (Web Application Firewall)
 
-Provides against DDoS attacks with AWS resources. This is a denial of
-service attack. Normally not possible to block them by using individual
-IP addresses. Without detailed analysis, the traffic looks like normal
-requests to your website.
+Both provide **global perimeter protection.**
 
-- Shield Standard
-  - Free with Route53 and CloudFront as default
-  - Provides layer 3 and layer 4 protection against DDoS attacks.
-- Shield advanced
+#### AWS Shield
+
+- provides AWS resources with **DDoS protection**
+- normally not possible to block them by blocking individual IP addresses. 
+  - without detailed analysis, the traffic looks like normal requests to your website.
+
+- Shield **Standard**
+  - **Free** with **Route53** and **CloudFront (CDN)**, enabled by default
+  - Provides **Layer 3** and **Layer 4 protection** against **DDoS** attacks.
+- Shield **Advanced**
   - $3000 per month
-  - Includes EC2, ELB, CloudFront, Global Acceleration and R53
-  - Provides access to DDoS advanced response team and financial insurance
-against increased costs.
+  - Includes **EC2, ELB, CloudFront, Global Accelerator and Route53 !!!!**
+  - Provides access to DDoS advanced **response team** and **financial insurance**
 
-- WAF (web application firewall)
-  - Layer 7 firewall (HTTP/s) firewall
-  - Protects against complex layer 7 attacks:
-    - SQL injections
-    - cross-site scripting
-    - geo blocks
-    - rate awareness
-  - WEBACL integrated with Load Balancers, API gateways, and CloudFront.
-    - Rules are added to WEBACL and evaluated when traffic arrives.
+#### WAF (Web Application Firewall)
+
+- **Layer 7 !!!** firewall (HTTP/s) firewall
+  - normally firewalls operate on Layers 3/4/5 (they understand IP, TCP, UDP and session - but can't interrogate packets)
+- Protects against **complex Layer 7 attacks**:
+  - SQL injections
+  - Cross-Site Scripting
+  - Geo Blocks
+  - Rate Awareness
+- Web Access Control List (**WEBACL**) integrates with **ALB, API Gateway, and CloudFront**
+  - so we'd integrate e.g. CloudFront Distribution to use WEBACL
+- **Rules** are added to **WEBACL** and **evaluated when traffic arrives**
 
 #### Example of Architecture
 
-Shield standard automatically looks at the data before any data reaches
-past Route53.
-The user is directed to the closest CloudFront location. Again, shield
-standard looks at the data again before it moves on.
+Points of filtering:
 
-WAF Rules are defined and included in a WEBACL which is associated to a
-cloud front distribution and deployed to the edge.
+1. **Shield Standard** automatically looks at the request when it arrives at **Route53**.
+2. The user is directed to the closest **CloudFront** location. 
+  - Again, **Shield Standard** looks at the request again before it moves on.
+3. **WAF Rules** are defined and included in a **WEBACL** which is associated to a
+CloudFront Distribution and deployed to the edge.
+  - the WEBACL filters traffic at the edge
+4. **WAF** can be also used on the **Application Load Balancer**
+  - by associating WEBACL with the load balancer
 
-Shield advanced can then intercept traffic when it reaches the load balancer.
-Once the data reaches the VPC, it has been filtered at Layer 3, 4, and 7
-already.
 
-Layer 7 filtering is only provided by WAF.
+For the exam !!!:
+- link the term `DDoS` with AWS Shield
+  - AWS Shield comes as **Standard** when using **Route53 and/or CloudFront**
+  - AWS Shield **Advanced** comes with extra cost, provides **financial insurance** against increased resource costs in response to DDoS attack. Provides access to **24/7, 365, DDoS response team**
+- link the terms `Layer 7 filtering`, `HTTP(S) filtering` with WAF
+  - WAF can be linked to **CloudFront, API Gateway, Application Load Balancer**
 
 ### CloudHSM
 
-KMS is the key management service within AWS. It is used for encryption within
-AWS and it integrates with other AWS products. Can generate keys, manage
-keys, and can integrate for encryption. The problem is this is a shared
-service. You're using a service which other accounts within AWS also use.
-Although the permissions are strict, AWS still does manage the hardware for KMS.
-KMS is a hardware security module or HSM. These are industry standard pieces
-of hardware which are designed to manage keys and perform cryptographic
-operations.
+- KMS is the key management service within AWS. 
+  - It is used for encryption within AWS and it integrates with other AWS products. 
+  - Can generate keys, manage keys, and can integrate for encryption. 
+  - **The problem is** this is a **shared service**. 
+  - You're using a **service** which **other accounts** within AWS **also use**.
+  - Although the **permissions are strict**, **AWS still does manage the hardware** for KMS.
+- KMS behind the scenes uses **Hardware Security Module** (HSM). 
+  - These are industry standard pieces of hardware which are **designed to manage keys** and **perform cryptographic operations**
+- You can run your own **Hardware Security Module** on premise. 
+- **CloudHSM** is a true **"single tenant"** Hardware Security Module (HSM) that's **hosted within the AWS Cloud**
+- the term HSM could refer to both CloudHSM, or an on-premise HSM device, or both
+- AWS **PROVISIONED**, but fully **CUSTOMER MANAGED**
+  - AWS has **no access** to **secure area** where key material is held
+  - HSMs operate in **AWS managed HSM VPC**
+  - **interfaces (ENIs) are added to the customer VPC**
+  - AWS provisions the HW, but it is **impossible for AWS to help** if we lose access by **accident**. 
+  - There is no way to recover data from them if access is lost.
 
-You can run your own HSM on premise. Cloud HSM is a true "single tenant"
-hardware security module (HSM) that's hosted within the AWS cloud.
-AWS provisions the HW, but it is impossible for them to help. There is no way
-to recover data from them if access is lost.
+- Fully **FIPS 140-2 !!!** Level 3 (KSM is L2 overall, but some is L3)
+  - if you require **Level 3** overall, you MUST use **CloudHSM**.
 
-Fully FIPS 140-2 Level 3 (KSM is L2 overall, but some is L3)
-IF you require level 3 overall, you MUST use CloudHSM.
+- all **KMS** actions are performed with AWS CLI and IAM roles.
+- but **HSM will not integrate with AWS** by design. instead it **uses industry standard APIs !!!**
+  - PKCS#11
+  - Java Cryptography Extensions (JCE)
+  - Microsoft CryptoNG (CNG) libraries
 
-KSM all actions are performed with AWS CLI and IAM roles.
+- KMS can use CloudHSM as a **custom key store**
+  - CloudHSM integrates with KMS
 
-HSM will not integrate with AWS by design and uses industry standard APIs.
+- HSM is **not highly available and runs within one AZ !!!**. 
+  - To be HA, we need **at least two HSM devices**, **one in each AZ** we use. 
+  - once HSM is in a **cluster**, it **replicates all keys, policies, configuration** automatically.
+- HSM needs an endpoint in the subnet of the VPC to allow resources access to the cluster.
 
-- PKCS#11
-- Java Cryptography Extensions (JCE)
-- Microsoft CryptoNG (CNG) libraries
-
-KMS can use CloudHSM as a custom key store, CloudHSM integrates with KMS.
-
-HSM is not highly available and runs within one AZ. To be HA, you need at least
-two HSM devices and one in each AZ you use. Once HSM is in a cluster, they
-replicate all policies in sync automatically.
-
-HSM needs an endpoint in the subnet of the VPC to allow resources access
-to the cluster.
-
-AWS has no access to the HSM appliances which store the keys.
 
 #### Cloud HSM Use Cases
 
-- No native AWS integration with AWS products. You can't use S3 SSE with
-CloudHSM.
-- Can offload the SSL/TLS processing from webservers. CloudHSM
-is much more efficient to do these encryption processes.
-- Oracle Databases can use CloudHSM to enable transparent data encryption (TDE)
-- Can protect the private keys an issuing certificate authority.
-- Anything that needs to interact with non AWS products.
+- **No native AWS integration** with AWS products 
+  - e.g. can't use S3 SSE with CloudHSM.
+- Can **offload the SSL/TLS processing** from webservers. 
+  - CloudHSM is **much more efficient to do these encryption processes**
+  - KMS cannot do it
+- **Oracle** Databases can use CloudHSM to enable **Transparent Data Encryption (TDE)**
+  - AWS has no ability to decrypt that data
+  - useful for **highly restricted environments**
+- **Protect** the **private keys** for an **Issuing Certificate Authority (CA)**
+- Anything that needs to **interact with non-AWS products** - use HSM !!!
+- Anything that needs to interact with AWS products - don't use HSM
 
 ---
 
@@ -5919,102 +5937,124 @@ is much more efficient to do these encryption processes.
 
 ### DynamoDB Architecture
 
-NoSQL Database as a Service (DBaaS)
+- NoSQL **Public** Database as a Service (**DBaaS**) - **Key/Value & Document**
+  - accesible anywhere with access to public endpoints of DynamoDB
+  - ... so public internet or VPC with **Internet Gateway** or **Gateway Endpoint** (which gives access only to S3 and DynamoDB)
+- handles simple **Key/Value** data or **DocumentDB** modeled data
+  - strictly speaking, it's a **wide-column Key/Value database**
+- Not like **RDS/Aurora/Aurora Serverless** which are **Database Server as a Product**.
+  - DynamoDB has **no self-managed servers or infrastructure !!!**
+  - with DynamoDB, we get the actual database delivered as a service
+- **Manual / Automatic / On-Demand** provisioned performance IN / OUT
+- **Highly Resilient** across **multiple AZs** (as a region)
+  - optionally **Globally resilient**.
+- Data is **replicated** across multiple storage nodes **by default**.
+- Really **fast, single-digit millisecond access** to data.
+- Supports **backups** with **point-in-time recovery** 
+- Any data is **encrypted at rest**.
+- Allows **Event-Driven integration**
+  - do things when data changes.
 
-- Wide column Key/Value database.
-- Not like RDS which is a Database Server as a Product.
-  - This is only the database.
-- Capacity can be provisioned or use on-demand mode
-- Highly resilient across AZs and optionally globally resilient.
-- Data is replicated across multiple storage nodes by default.
-- Really fast, single digit millisecond access to data.
-- Supports backups with point in time recovery and encryption at rest.
-- Allows event-driven integration. Do things when data changes.
+- more like **Database Table** as a Service product
 
 #### Dynamo DB Tables
 
-- **Table** a grouping of items which share the same primary key.
-- **Items** within a table are how you manage the data.
-  - There is no limit to the number of items in a table.
-- Two types of primary key:
-  - Simple (Partition)
-  - Composite (Partition and Sort)
-- Every item in the table needs a unique primary key.
-- Attributes may or may not be there. This is not necessary.
-- Items can be at most 400KB in size. This includes the primary key and
-attributes.
+- tables are **base entity** inside DynamoDB
+- **table** a **grouping of items** which **share** the **same primary key**
+  - tables can have **infinite number** of **items** within them
+  - there is **no limit** to the number of items
+- **items** within a table are how you manage the data.
+- **two types** of primary key:
+  - **simple** (**PARTITION** key)
+  - **composite** (**PARTITION** key and **SORT** key)
+- notice that **PARTITION** key doesn't always mean **PRIMARY KEY**
+  - if primary key is **composite**, then this assumption is not true
+- **every item** in the table has to use the **same primary key**
+  - it has to have an unique value for that primary key
+  - if the primary key is **composite**, then the **combination** of **PK** (Partition Key) and **SK** (Sort Key) has to **be unique**
+- each **item** can have:
+  - no attributes
+  - all attributes
+  - mixed attributes
+  - different attributes
+- DynamoDB has **no rigid attribute schema**
+- items can be **max 400KB** in size. 
+  - This includes the primary key and attributes.
 
-In DynamoDB, capacity means speed. If you choose on-demand capacity model
-you don't have to worry about capacity. You only pay for the operations
-for the table.
-If you choose provisioned capacity, you must set this on a per table basis.
+- In DynamoDB, **CAPACITY means SPEED !!!**. 
+  - in this case: SPEED, not SPACE
+- **two types** of capacity models: **ON-DEMAND, PROVISIONED**
+  - can switch between them
+  - if you choose **on-demand capacity** model you don't have to worry about capacity. 
+  - you only pay for the operations for the table.
+  - if you choose **provisioned capacity**, you must set this on a **per table basis**.
 
-Capacity is set per WCU or RCU
-
-1 WCU means you can write 1KB per second to that table
-1 RCU means you can read 4KB per second for that table
+- Capacity is set per **WCU (Write Capacity Unit)** or **RCU (Read Capacity Unit)**:
+  - 1 WCU means you can **write 1KB/s** to that table
+  - 1 RCU means you can **read 4KB/s** for that table
 
 #### Dynamo DB Backups
 
-**On-demand Backups**: Similar to manual RDS snapshots. Full backup of the table
-that is retained until you manually remove that backup. This can be used to
-restore data in the same region or cross-region. You can adjust indexes, or
-adjust encryption settings.
+**On-demand Backups**: 
+- Similar to **manual RDS snapshots**. 
+  - **Full backup** of the table that is **retained until you manually remove** that backup. 
+  - This can be used to **restore data and CONFIGURATION** in the **same region or cross-region**. 
+  - You can restore **with or without INDEXES**, or **adjust encryption** settings.
 
-**Point-in-time Recovery**: Must be enabled on each table and is off by
-default. This allows continuous record of changes for 35 days to allow you to
-replay any point in that window to a 1 second granularity.
+**Point-in-time Recovery**: 
+- **Must be enabled** on each table and is **off by default**. 
+- This allows **continuous record of changes** over **35 days window**
+- Allows to **replay** any point in that window to a **1 second granularity**.
 
 #### Dynamo DB Considerations
 
-- NoSQL, you should jump towards DynamoDB.
-- Relational data, this is NOT DynamoDB.
-- If you see key value and DynamoDB is an answer, this is likely the proper
-choice.
+- **NoSQL** -> you should jump towards DynamoDB.
+- **Key/Value** -> you should jump towards DynamoDB.
+- access to DynamoDB is via **Console, CLI, or API**
+- SQL / Relational data -> this is **NOT** DynamoDB.
 
-Access to Dynamo is from the console, CLI, or API. You don't have SQL access.
+- **Billing** based on:
+  - **RCU and WCU**
+  - **Storage** on that table
+  - Additional **features** on that table
 
-Billing based on:
-
-- RCU and WCU
-- Storage on that table
-- Additional features on that table
-
-Can purchase reserved capacity with a cheaper rate for a longer term commit.
+- Can purchase **reserved allocations for capacity** with a **cheaper rate** for a **longer term**
 
 ### DynamoDB Operations, Consistency, and Performance
 
 #### DynamoDB Reading and Writing
 
-**On-Demand**: Unknown or unpredictable load on a table. This is also good
-for as little admin overhead as possible. Pay a price per million
-Read or Write units. This is as much as 5 times the price as provisioned.
+**On-Demand**: 
+- Don't have to explicitly set capacity settings - all handled by DynamoDB
+- **Unknown or unpredictable load** on a table.
+- Priority on as **little admin overhead** as possible
+- Pay a **price** per **million Read or Write units**. 
+- This can be as much as 5 times the price vs provisioned
+  - we reduce overhead and are able to cope with unknown level of demand, BUT we are **paying more** for that privilege
 
-**Provisioned**: RCU and WCU set on a per table basis.
-
-Every operation consumes at least 1 RCU/WCU
-
-1 RCU = 1 x 4KB read operation per second. This rounds up.
-1 WCU = 1 x 1KB write operation per second.
-
-Every single table has a WCU and RCU burst pool. This is 500 seconds
-of RCU or WCU as set by the table.
+**Provisioned**: 
+- **RCU and WCU** set on a **per table basis**.
+- **Every** operation consumes **AT LEAST 1 RCU\*/WCU**
+  - there's a way to get cheaper RCU: eventually-consistent reads are half the price (8 KB/s)
+- 1 RCU = 1 x **4KB read operation per second**. This rounds up to at least 1 RCU\*
+- 1 WCU = 1 x **1KB write operation per second**.
+- Every table has a **WCU and RCU burst pool**. 
+  - This is **300 seconds of RCU or WCU** set on the table
+- we should rely on the number of RCU/WCU we provision, not the burst pool
 
 #### Query
 
-You have to pick one Partition Key (PK) value to start.
+- when performing query operation, we need to **pick ONE Partition Key (PK) value** 
+  - ... and **OPTIONALLY** a **Sort Key (SK) value** or **RANGE of Sort Key values !!!**
+- query may return no items, one item, or multiple items
+  - ... but regardless, we provide only one Partition Key to the query
 
-The PK can be the sensor unit, the Sort Key (SK) can be the day of the
-week you want to look at.
+- **Capacity** consumed is the **SIZE of all returned items**. 
+  - further filtering discards data, but **Capacity is still consumed**.
 
-Query accepts a single PK value and **optionally** a SK or range.
-Capacity consumed is the size of all returned items. Further filtering
-discards data, but capacity is still consumed.
-
-In this example you can only query for one weather station.
-
-If you query a PK it can return all fields items that match. It is always
-more efficient to pull as much data as needed per query to save RCU.
+- If you query a PK it can return all fields items that match. 
+- It is **always more efficient to pull as much data** as needed per query to save RCU
+  - splitting the queries to separate ones may cause unnecessary rounding up of RCUs 
 
 You have to query for at least one item of PK and are charged for the
 response of that query operation.
@@ -6024,48 +6064,57 @@ charged for pulling all the attributes against that query.
 
 #### Scan
 
-Least efficient when pulling data from Dynamo, but the most flexible.
-
-Scan moves through the table item by item consuming the capacity
-of every item. Even if you consume less than the whole table, it will
-charge based on that. It adds up all the values scanned and will charge
-rounding up.
+- **LEAST EFFICIENT** when pulling data from DynamoDB, but the **MOST FLEXIBLE**
+- Scan **moves through the ENTIRE table item by item** 
+  - ... consuming the capacity of every item. 
+  - even if you consume less than the whole table (by using **attributes and filters**), it will charge based on **every ITEM scanned through**
+- It adds up and will charge rounding up.
 
 #### DynamoDB Consistency Model
 
-**Eventually** Consistent: easier to implement and scales better
-**Strongly (Immediately)** Consistent: more costly to achieve
+- **Consistency** - how when data is updated, and then immediately read, is that read data **immediately** the same as the recent update, or is it **eventually** the same?
+- DynamoDB can operate using two different **consistency modes** for **read operations**
+  - **Eventually** Consistent
+    - easier to implement
+    - scales better
+    - RCUs are 50% of the Strongly consistent, when **Eventual Consistency is enabled !!!** (8 KB/s, same price)
+    - can be unlucky with **stale data** if a node is checked **before replication is completed**
+  - **Strongly (Immediately)** Consistent
+    - more **costly** to achieve
+    - strongly consistent read **always uses the Leader node**
+    - **less scalable**.
 
-Every piece of data is replicated between storage nodes. There is one
-Leader storage node and every other node follows.
+- Every piece of data is **replicated** multiple times **between separate AZs** 
+  - a point in each AZ is called **Storage Node**. 
+- There is one **Leader storage node** and every other node follows.
+  - **writes are always directed to the Leader node !!!**. 
+  - once the Leader is complete, it's **consistent**. 
+  - it then **starts** the process of **replication**.
+  - length of this replication is usually in miliseconds, but it **depends on the load** on these **Storage Nodes**
+  - this assumes the lack of any faults on the storage nodes.
 
-Writes are always directed to the **leader node**. Once the leader
-is complete, it is **consistent**. It then starts the process of replication.
-This typically takes milliseconds and assumes the lack of any faults on the
-storage nodes.
-
-Eventual consistent could lead to stale data if a node is checked before
-replication completes. You get a discount for this risk.
-
-A strongly consistent read always uses the leader node and is less
-scalable.
 
 Not every application can tolerate eventual consistency. If you have a stock
 database or medical information, you must use strongly consistent reads.
 If you can tolerate the cost savings you can scale better.
 
-#### WCU Example Calculation
+#### WCU Example Calculation !!!!
 
 - Store 10 items per second with 2.5K average size per item.
-- Calculate WCU per item, round up, then multiply by average per second.
-- (2.5 KB / 1 KB) = 3 * 10 p/s = 30 WCU
+- Calculate:
+  - **WCU per item**: in this case, each item is 2.5KB / 1 KB (WCU rate) = 2.5
+  - **round up**: 2.5 => 3 WCU
+  - multiply by **items per second**: 3 WCU * 10 items/s = 30 WCU
+
 
 #### RCU Example Calculation
 
 - Retrieve 10 items per second with 2.5K average size per item.
-- Calculate RCU per item, round up, then multiply by average per second.
-- (2.5 KB / 4 KB) = 1 * 10 p/s = 10 RCU for strongly consistent.
-  - 5 RCU for eventually consistent.
+- Calculate:
+  - **RCU per item**: in this case, each item is 2.5KB / 4 KB (RCU rate) = 0.625
+  - **round up**: 0.625 => 1 RCU
+  - multiply by **items per second**: 1 RCU * 10 items/s = 10 RCU for strongly consistent
+    - for eventually consistent, 5 RCU
 
 ### DynamoDB Streams and Triggers
 
