@@ -5978,7 +5978,7 @@ For the exam !!!:
   - mixed attributes
   - different attributes
 - DynamoDB has **no rigid attribute schema**
-- items can be **max 400KB** in size. 
+- items can be **max 400 KB !!!** in size. 
   - This includes the primary key and attributes.
 
 - In DynamoDB, **CAPACITY means SPEED !!!**. 
@@ -6049,7 +6049,7 @@ For the exam !!!:
 - query may return no items, one item, or multiple items
   - ... but regardless, we provide only one Partition Key to the query
 
-- **Capacity** consumed is the **SIZE of all returned items**. 
+- **Capacity** consumed is the **SIZE of ALL RETURNED items**. 
   - further filtering discards data, but **Capacity is still consumed**.
 
 - If you query a PK it can return all fields items that match. 
@@ -6067,7 +6067,7 @@ charged for pulling all the attributes against that query.
 - **LEAST EFFICIENT** when pulling data from DynamoDB, but the **MOST FLEXIBLE**
 - Scan **moves through the ENTIRE table item by item** 
   - ... consuming the capacity of every item. 
-  - even if you consume less than the whole table (by using **attributes and filters**), it will charge based on **every ITEM scanned through**
+  - even if you consume less than the whole table (by using **attributes and filters**) after using scan, it will charge based on **every ITEM scanned through** anyway
 - It adds up and will charge rounding up.
 
 #### DynamoDB Consistency Model
@@ -6166,6 +6166,7 @@ If you can tolerate the cost savings you can scale better.
   - cannot be created after the table has been already created
 - limit: **max 5 LSIs per base table !!!**
 - **shares** the **RCU and WCU** with the **table**
+  - IMPORTANT: LSI provides **Shared Capacity Settings with the table !!!**
 - attributes:
   - ALL
   - KEYS_ONLY
@@ -6174,6 +6175,8 @@ If you can tolerate the cost savings you can scale better.
   - it means that only items that **have the attribute (which we chosen as the new SK)** are present in the index !!!
   - so if we choose an attribute, the items that don't have this attribute will be omitted !!!
 - LSIs are **strongly consistent !!!**
+
+
 
 
 #### Global Secondary Index (GSI)
@@ -6303,30 +6306,61 @@ by implementing DAX and caching those results.
 
 ### Amazon Athena
 
-- You can take data stored in S3 and perform Ad-hoc queries on data. Pay
-only for the data consumed.
-- Start off with structured, semi-structured and even unstructured data that is
-stored in its raw form on S3.
-- Athena uses **schema-on-read**, the original data is never changed
-and remains on S3 in its original form.
-- The schema which you define in advance, modifies data in flight when its read.
+- **Serverless** Interactive Querying Service
+  - it means we can **take data stored in S3** and **perform AD-HOC QUERIES** on that data. 
+  - pay only for the **data consumed**: no base cost or setup time
+- Start off with **structured, semi-structured and even unstructured data** that is stored in its **raw form** on **S3**.
+- Athena uses **Schema-on-read**
+  - schema translated data => **relational-like** when read
+- the **original data** is **never changed** and **remains on S3** in its original form.
 - Normally with databases, you need to make a table and then load the data in.
 - With Athena you create a schema and load data on this schema on the fly in
 a relational style way without changing the data.
 - The output of a query can be sent to other services and can be
 performed in an event driven fully serverless way.
-
+ 
 #### Athena Explained
 
-The source data is stored on S3 and Athena can read from this data.
-In Athena you are defining a way to get the original data and defining
-how it should show up for what you want to see.
+- inside Athena we create a **SCHEMA** (Schema-on-read)
+- inside this **SCHEMA** we define **TABLES**
+- these **TABLES** define how to get **from the format of original source data** to a **table structure**
+  - this is **unlike** to **Relational Databases** where **table is the final structure**
+- data is projected through the tables when read
+- it **allows SQL-like queries** on data without **transforming** source data
+- output can be sent to visualisation tools
+  - we can optimize the original data set to reduce the amount of space used
 
-Tables are defined in advance in a data catalog and data is projected
-through when read. It allows SQL-like queries on data without transforming
-the data itself.
 
-This can be saved in the console or fed to other visualization tools.
 
-You can optimize the original data set to reduce the amount of space uses
-for the data and reduce the costs for querying that data.
+### ElastiCache
+
+- **in-memory** database with **high performance**
+- managed **Redis** or **Memcached** as a service
+- can be used to cache data - for **READ HEAVY** workloads with **low latency** requirements
+- **reduces** database **workloads** (COST EFFECTIVE)
+- can be used to store **SESSION Data** (**STATELESS** Servers)
+  - Session State is written to ElastiCache
+  - if the instance the user was using fails, the session state is still kept in the cache and the session continues with no interruption
+- **requires application code changes !!!**
+  - app needs to understand caching architecture
+
+
+#### **Redis** vs **Memcached**:
+- both engines offer < 1ms access to data
+- both support range of programming languages
+- support of data structures:
+  - Memcached - **simple** data structures (strings)
+  - Redis - **advanced** data structures (lists, sets, sorted sets, hashes, bit arrays, and more)
+- replication:
+  - Memcached 
+    - **NO REPLICATION !!!**
+    - multiple nodes (**sharding**)
+  - Redis 
+    - **Multi-AZ !!!**
+    - replication (Scale Reads)
+- backups:
+  - Memcached - **no backups**
+  - Redis - **backup & restore**
+- performance:
+  - Memcached - **Multi-thread !!!** - super fast
+  - Redis - **Transactions !!!** (treating operations as one, i.e. either all of the operations work or none work at all)
