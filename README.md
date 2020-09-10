@@ -6364,3 +6364,38 @@ performed in an event driven fully serverless way.
 - performance:
   - Memcached - **Multi-thread !!!** - super fast
   - Redis - **Transactions !!!** (treating operations as one, i.e. either all of the operations work or none work at all)
+  
+  
+### Redshift
+- is an OLAP database (vs OLTP databases like RDS that are used to process transactions in real time and deal with rows)
+- designed for reporting & analytics
+- designed for complex queries to analyze aggregated historical data from other OLTP systems
+- stores data in columns -- design for better column based queries for analytics & reporting
+- delivered as a service like RDS, needs to be provisioned in cluster
+- **Redshift Spectrum**
+  - can be used to query data directly from S3 without loading it into cluster
+  - can also be used for federated query (like federated identity) to query data stored in remote sources
+  - still needs Redshift cluster to run queries, can't do it ad-hoc like Athena
+- integrated with other AWS products like Quicksight for visualization
+- also has SQL like interface - can connect using JDBC/ODBC interfaces
+- cluster architecture
+  - runs in private network & needs high speed network
+  - most of it inaccessible directly
+  - runs in one AZ
+  - leader node handles query input, planning & aggregation
+  - compute nodes performs the queries on data - partitioned into slices - they work in parallel - each slice processes portion of work load assigned to it
+  - 2-32 slices per compute node
+- runs in VPC - has VPC security, IAM permissions, KMS at rest encryption, CloudWatch monitoring
+- Enhanced VPC routing can be enabled to haved control over advanced networking of the cluster
+- runs in one AZ but tries to secure data
+  - data is replicated to one additional node to protect against local hardware failure
+  - automatic snapshots to S3 (every 8 hours or 5GB) free retention (1 day default, configurable upto 35 days)
+  - manual snapshots to S3 can be done too (no retention, stays forever until you remove it)
+  - snapshots are incremental
+  - S3 is region resilient, but can be configured to copy snapshots to another S3 region, can also be used to spin up another Redshift cluster in different region
+- data can be
+  - loaded from (& unloaded to) S3
+  - copied from DynamoDB
+  - migrated from other sources using **DMS (Data Migration Service)**
+  - streamed from Kinesis Firehose
+  
