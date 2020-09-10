@@ -6399,3 +6399,13 @@ performed in an event driven fully serverless way.
   - migrated from other sources using **DMS (Data Migration Service)**
   - streamed from Kinesis Firehose
   
+  
+### Other Services
+
+These are some other services as seen in Jon Bonso tests - 
+
+- **Amazon Macie** - fully managed data security and data privacy service that uses machine learning and pattern matching to discover and protect your sensitive data in AWS
+- **Amazon GuardDuty** -  detection service that continuously monitors for malicious activity and unauthorized behavior to protect your AWS accounts, workloads, and data stored in Amazon S3
+  - Amazon GuardDuty provides broad protection of your AWS accounts, workloads, and data by helping to identify threats such as attacker reconnaissance, instance compromise, account compromise, and bucket compromise. Amazon Macie helps you discover and protect your sensitive data in Amazon S3 by helping you classify what data you have and the security and access controls associated with that data. 
+- **Amazon Rekognition** - service that can identify the objects, people, text, scenes, and activities, as well as detect any inappropriate content on your images or videos
+- **Amazon Inspector** - an automated security assessment service that helps improve the security and compliance of applications deployed on AWS - automatically assesses applications for exposure, vulnerabilities, and deviations from best practices
