@@ -6405,7 +6405,31 @@ performed in an event driven fully serverless way.
 These are some other services as seen in Jon Bonso tests - 
 
 - **Amazon Macie** - fully managed data security and data privacy service that uses machine learning and pattern matching to discover and protect your sensitive data in AWS
+
 - **Amazon GuardDuty** -  detection service that continuously monitors for malicious activity and unauthorized behavior to protect your AWS accounts, workloads, and data stored in Amazon S3
   - Amazon GuardDuty provides broad protection of your AWS accounts, workloads, and data by helping to identify threats such as attacker reconnaissance, instance compromise, account compromise, and bucket compromise. Amazon Macie helps you discover and protect your sensitive data in Amazon S3 by helping you classify what data you have and the security and access controls associated with that data. 
+
 - **Amazon Rekognition** - service that can identify the objects, people, text, scenes, and activities, as well as detect any inappropriate content on your images or videos
+
 - **Amazon Inspector** - an automated security assessment service that helps improve the security and compliance of applications deployed on AWS - automatically assesses applications for exposure, vulnerabilities, and deviations from best practices
+
+- **Amazon WorkDocs** - fully managed, secure content creation, storage, and collaboration service. With Amazon WorkDocs, you can easily create, edit, and share content, and because it’s stored centrally on AWS, access it from anywhere on any device.
+  - needs a directory service, either let WorkDocs manage it for your or connect it to existing Microsoft Active Directory using AWS Active Directory Connector, or by integrating with AWS Microsoft AD using Active Directory trust relationships
+  - can't use S3 for storage, it's handled internally
+
+- **AWS Resource Access Manager (RAM)** - service that enables you to easily and securely share AWS resources with any AWS account or within your AWS Organization. You can share AWS Transit Gateways, Subnets, AWS License Manager configurations, and Amazon Route 53 Resolver rules resources with RAM.
+  - You can create resources centrally in a multi-account environment, and use RAM to share those resources across accounts in three simple steps: create a Resource Share, specify resources, and specify accounts.
+  - RAM is available to you at no additional charge.
+
+- **AWS Control Tower** - offers the easiest way to set up and govern a new, secure, multi-account AWS environment. It establishes a landing zone that is based on best-practices blueprints, and enables governance using guardrails you can choose from a pre-packaged list. The landing zone is a well-architected, multi-account baseline that follows AWS best practices. Guardrails implement governance rules for security, compliance, and operations.
+
+- **AWS Landing Zone** - solution that helps customers more quickly set up a secure, multi-account AWS environment based on AWS best practices. AWS Landing Zone deploys an AWS Account Vending Machine (AVM) product for provisioning and automatically configuring new accounts. The AVM leverages AWS Single Sign-On for managing user account access.
+
+- **AWS Control Tower vs AWS Control Tower**
+  - Control Tower is an AWS native service providing a pre-defined set of blueprints and guardrails to help customers implement a landing zone for new AWS accounts.
+  - AWS Landing Zone is an AWS solution offered through AWS Solution Architect, Professional Services, or AWS Partner Network (APN) Partners providing a fully configurable, customer-managed landing zone implementation.
+  - You should use AWS Control Tower if you are looking for a self-service experience to set up a new AWS environment based on a landing zone with pre-configured blueprints and then interactively govern your accounts with pre-configured guardrails.
+  - You should use the AWS Landing Zone solution if you are looking to set up a configurable landing zone with rich customization options through custom add-ons (e.g., Active Directory, Okta Directory) and change management through a code deployment and configuration pipeline
+
+- **Amazon Data Lifecycle Manager (Amazon DLM)**
+  - automate the creation, retention, and deletion of snapshots taken to back up your Amazon EBS volumes
